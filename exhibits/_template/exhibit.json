@@ -1,0 +1,32 @@
+{
+  "id": "template",
+  "name": "<Exhibit name>",
+  "aliases": [],
+  "object_kind": ["ecosystem"],
+  "status": "stub",
+  "era": {
+    "introduced": null,
+    "mainstream": null,
+    "declined": null,
+    "notes": null
+  },
+  "layers": {
+    "physical": { "status": "unknown", "notes": null },
+    "electrical": { "status": "unknown", "notes": null },
+    "signaling": { "status": "unknown", "notes": null },
+    "protocol": { "status": "unknown", "notes": null },
+    "host": { "status": "unknown", "notes": null },
+    "ecosystem": { "status": "stub", "notes": null }
+  },
+  "roles": [],
+  "topology": null,
+  "evidence_summary": {
+    "highest_level": "E5",
+    "primary_sources": 0,
+    "hardware_status": "not-planned",
+    "notes": null
+  },
+  "relationships": [],
+  "safety_notes": [],
+  "open_questions": []
+}

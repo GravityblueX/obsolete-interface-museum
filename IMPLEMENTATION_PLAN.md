@@ -2,12 +2,12 @@
 
 ## Phase 0 — Exhibit contract
 
-- [ ] `docs/EVIDENCE.md`；
-- [ ] `docs/HARDWARE-SAFETY.md`；
-- [ ] `schemas/exhibit.schema.json`；
-- [ ] `exhibits/_template/`；
-- [ ] 定义 `replaced-by / compatible-with / physically-similar / protocol-carried-over / electrically-related`；
-- [ ] 用 RS-232 / ISA / IDE 三种不同层次对象验证模板。
+- [x] `docs/EVIDENCE.md`；
+- [x] `docs/HARDWARE-SAFETY.md`；
+- [x] `schemas/exhibit.schema.json`；
+- [x] `exhibits/_template/`；
+- [x] 定义 `replaced-by / compatible-with / physically-similar / protocol-carried-over / electrically-related`；
+- [x] 用 RS-232 / ISA / IDE 三种不同层次对象验证模板（见 `docs/TEMPLATE-VALIDATION.md`）。
 
 ## Phase 1 — RS-232
 

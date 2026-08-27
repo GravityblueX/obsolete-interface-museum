@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tmzncty/obsolete-interface-museum/schemas/exhibit.schema.json",
+  "title": "Obsolete Interface Museum exhibit metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "object_kind",
+    "status",
+    "layers",
+    "era",
+    "evidence_summary",
+    "relationships"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "aliases": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "object_kind": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "connector",
+          "electrical-standard",
+          "signaling-system",
+          "protocol",
+          "command-model",
+          "bus",
+          "host-interface",
+          "device-interface",
+          "ecosystem"
+        ]
+      }
+    },
+    "status": {
+      "enum": ["stub", "researching", "documented", "experimented", "reviewed"]
+    },
+    "era": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["introduced"],
+      "properties": {
+        "introduced": { "type": ["string", "null"] },
+        "mainstream": { "type": ["string", "null"] },
+        "declined": { "type": ["string", "null"] },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+    "layers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["physical", "electrical", "signaling", "protocol", "host", "ecosystem"],
+      "properties": {
+        "physical": { "$ref": "#/$defs/layerState" },
+        "electrical": { "$ref": "#/$defs/layerState" },
+        "signaling": { "$ref": "#/$defs/layerState" },
+        "protocol": { "$ref": "#/$defs/layerState" },
+        "host": { "$ref": "#/$defs/layerState" },
+        "ecosystem": { "$ref": "#/$defs/layerState" }
+      }
+    },
+    "roles": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "topology": { "type": ["string", "null"] },
+    "evidence_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["highest_level", "primary_sources", "hardware_status"],
+      "properties": {
+        "highest_level": { "enum": ["E1", "E2", "E3", "E4", "E5"] },
+        "primary_sources": { "type": "integer", "minimum": 0 },
+        "hardware_status": {
+          "enum": ["not-planned", "blocked-for-hardware", "emulation-only", "measured"]
+        },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/relationship" }
+    },
+    "safety_notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "layerState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["not-applicable", "unknown", "stub", "documented", "verified"] },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "target", "layer", "scope"],
+      "properties": {
+        "type": {
+          "enum": [
+            "replaced-by",
+            "compatible-with",
+            "physically-similar",
+            "protocol-carried-over",
+            "electrically-related"
+          ]
+        },
+        "target": { "type": "string", "minLength": 1 },
+        "layer": {
+          "enum": ["physical", "electrical", "signaling", "protocol", "host", "ecosystem", "multiple"]
+        },
+        "scope": { "type": "string", "minLength": 1 },
+        "requires": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "direction": {
+          "enum": ["one-way", "bidirectional", "not-applicable", "unknown"]
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "notes": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
