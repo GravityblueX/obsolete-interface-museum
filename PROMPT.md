@@ -1,0 +1,3 @@
+# Ready-to-run agent prompt
+
+> 进入 `tmzncty/obsolete-interface-museum` 后，先读 `AGENTS.md`、`README.md`、`ROADMAP.md`、`IMPLEMENTATION_PLAN.md`、`docs/PRIOR_ART.md` 和当前 exhibit/lab。不要重新做宏观规划，从 `IMPLEMENTATION_PLAN.md` 中依赖已满足的最早未完成项开始直接施工。任何接口都要把 physical/electrical/signaling/protocol/OS integration/real ecosystem 分层，不得把插头形状当协议本体。关键 pinout、电平、时序和兼容结论优先用标准/原厂手册交叉验证；仿真与实测必须分开标记。未经验证不得给真实接线建议，不对昂贵或不可替代老硬件做风险热插拔。先完成 source map、术语清理和展品结构，再在安全条件满足时做仿真/实测。每完成一个跨层闭环就记录证据等级、局限与实验条件，提交 checkpoint，然后继续下一任务；没有真正的资料、安全或硬件 blocker 时不要停。最后汇报完成展品、来源、实验/仿真结果、commit、剩余下一任务和 blocker。
