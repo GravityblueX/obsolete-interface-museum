@@ -4,15 +4,15 @@
 
 ## M0 — 展柜标准
 
-- [ ] `exhibits/_template/`；
-- [ ] `docs/EVIDENCE.md`：原厂手册 / 二手资料 / 仿真 / 实测的证据分层；
-- [ ] `docs/HARDWARE-SAFETY.md`：电平、接线、热插拔、未知设备规则；
-- [ ] `schemas/exhibit.schema.json`；
-- [ ] 定义接口关系：`replaced-by / compatible-with / physically-similar / protocol-carried-over / electrically-related`。
+- [x] `exhibits/_template/`；
+- [x] `docs/EVIDENCE.md`：原厂手册 / 二手资料 / 仿真 / 实测的证据分层；
+- [x] `docs/HARDWARE-SAFETY.md`：电平、接线、热插拔、未知设备规则；
+- [x] `schemas/exhibit.schema.json`；
+- [x] 定义接口关系：`replaced-by / compatible-with / physically-similar / protocol-carried-over / electrically-related`。
 
 ### M0 验收
 
-用同一个模板分别描述 RS-232、ISA、IDE，仍能明确区分：
+已用 `docs/TEMPLATE-VALIDATION.md` 验证同一模板分别描述 RS-232、ISA、IDE 时，仍能明确区分：
 
 - connector；
 - electrical；
@@ -20,7 +20,7 @@
 - protocol；
 - OS integration。
 
-如果模板只能适合“外部插头”，说明模型不够好。
+模板不以“外部插头”为前提，内部 bus 和跨层存储接口家族也可以表达。
 
 ---
 
@@ -155,7 +155,7 @@ uncertainty
 
 ### Task A — 建展品模板
 
-从 README 的十个问题出发，建立 `exhibits/_template/`。要求同时适配 RS-232、ISA、SCSI，不写具体历史结论。
+已完成。模板位于 `exhibits/_template/`，证据、安全、关系词和 schema 已一并落地。
 
 ### Task B — RS-232 资料审查
 
