@@ -41,10 +41,10 @@ connector, cable and DTE/DCE mapping
 
 | ID | 来源与定位 | 等级 | 可支持 | 不能单独支持 |
 |---|---|---:|---|---|
-| S1 | ANSI/TIA-232-F-1997, *Interface Between Data Terminal Equipment and Data Circuit-Terminating Equipment Employing Serial Binary Data Interchange*；[封面/目录预览（含 2012 reaffirmation）](<https://www.normsplash.com/Samples/TIA/127475168/TIA-232-F-1997-(R2012)-en.pdf>) | E1（仅审阅预览，未取得全文） | 标准身份、正式标题、修订/重申日期与目录范围 | 本轮未读到正文，不能据此声称具体针脚、电压或时序条文 |
+| S1 | TIA-232-F-1997, *Interface Between Data Terminal Equipment and Data Circuit-Terminating Equipment Employing Serial Binary Data Interchange*；[封面/目录预览（含 2012 reaffirmation）](<https://www.normsplash.com/Samples/TIA/127475168/TIA-232-F-1997-(R2012)-en.pdf>)。封面使用 `TIA-232-F-1997`，其中复现的 1997 contents page 标为 `ANSI/TIA/EIA-232-F` | E1（仅审阅预览，未取得全文） | 标准身份、正式标题、修订/重申日期与目录范围 | 本轮未读到正文，不能据此声称具体针脚、电压或时序条文 |
 | S2 | ITU-T Recommendation V.24 (02/2000), *List of definitions for interchange circuits between DTE and DCE*；[公开全文入口](https://www.itu.int/rec/T-REC-V.24-200002-I/en)，§§1–4，尤其 pp. 1–6、13–17 | E1 | DTE/DCE 边界；103/104、105/106、107、108/2、109、125 等 circuits 的功能、方向和相互关系 | 不应当被写成完整 TIA-232-F 的逐条替代品；§1.2、§1.3 明确把 electrical 与 mechanical 特性委托给别的规范 |
 | S3 | ITU-T Recommendation V.28 (03/1993), *Electrical characteristics for unbalanced double-current interchange circuits*；[公开全文入口](https://www.itu.int/rec/T-REC-V.28-199303-I/en)，§§1–7，pp. 1–5 | E1 | interchange point 的等效电路、负载/发生器边界、±3 V 判定区、数据与控制 circuit 的极性语义、转换区与失效检测 | 连接器针脚；PC UART 寄存器；任意具体适配器一定达到的实测值 |
-| S4 | ISO/IEC 2110, *Information technology — Data communication — 25-pole DTE/DCE interface connector and contact number assignments*；由 V.24 §1.3 和 V.28 Figure 2 note 2 交叉指向 | E1（未取得全文） | 25-contact mechanical mapping 的规范入口 | 未取得全文前不得从二手表重建“标准针脚表” |
+| S4 | ISO 2110:1989 (3rd ed.), *Information technology — Data communication — 25-pole DTE/DCE interface connector and contact number assignments*；[IEC catalog record](https://webstore.iec.ch/en/publication/61738) 与 [Amd 1:1991 record](https://webstore.iec.ch/en/publication/61739)。V.28 Figure 2 note 2 只写无版次的 `ISO 2110`；V.24 §1.3 则把 mechanical characteristics 分派给 ISO/IEC connector standards | E1（仅元数据/交叉引用；未取得全文） | 标准身份、1989/1991 版本边界与 25-contact mechanical mapping 的规范入口 | 实际 contact assignment；1989/1991 文本是否可不变地套用到 IBM 1984 或更早设备 |
 | S5 | IBM, *IBM Personal Computer Technical Reference*, April 1984, part no. 6322507；[Internet Archive 扫描](https://archive.org/details/IBMPCIBM5150TechnicalReference6322507APR84)，pp. 3-3、5-8、5-50–5-54、8-2–8-5 | E1 | IBM PC 电源为何给 EIA driver/receiver 提供 ±12 V；BIOS 数据区与 8250；INT 14h 串口服务；当时 IBM 对 DTE/DCE、25-contact RS-232C 与 modem control 的解释 | 后来的 PC DE-9 mapping；所有兼容机；现代 USB 转换器行为 |
 | S6 | Texas Instruments, *MC1488, SN55188, SN75188 Quadruple Line Drivers*, SLLS094C；[datasheet](https://www.ti.com/lit/ds/symlink/sn75188.pdf)，pp. 1–4 | E1（器件） | 一类经典 line driver 的逻辑输入、双电源与线路输出；器件声明满足 TIA/EIA-232-E 与 V.28 | 整个接口标准；某块 IBM 卡一定使用哪个具体厂牌/修订器件 |
 | S7 | Texas Instruments, *MC1489(A), SN55189(A), SN75189(A) Quadruple Line Receivers*, SLLS095D；[datasheet](https://www.ti.com/lit/ds/symlink/sn75189a.pdf)，pp. 1–4 | E1（器件） | 一类经典 line receiver 的 3–7 kΩ 输入、线路侧输入范围与 5 V logic 输出 | 标准规定与单一器件能力之间不能画等号 |
@@ -56,8 +56,9 @@ connector, cable and DTE/DCE mapping
 
 ### 获取状态说明
 
-- S2、S3、S5–S12 的链接与所列章节已在本轮打开核对；外链不等于将原文版权内容提交进仓库。
-- S1 与 S4 是正式标准入口，但本轮没有取得合法可审阅全文，故明确标为 **未取得全文**。
+- S2、S3 所列章节以及 S5–S12 的内容已在本轮打开核对；外链不等于将原文版权内容提交进仓库。
+- 2026-09-01 最终自动化可达性复查中，S1、S4–S9、S11–S12 使用 browser user-agent 返回 200；S10 同样返回 200，但 generic curl 被 403 bot filter 拦截；ITU 的 S2/S3 permalink 从本审计网络返回 500。后两项是当前站点访问限制，不能据此声称文献撤回，也不应写成“所有链接直接返回 200”。
+- S1 与 S4 是正式标准入口，但本轮没有取得合法可审阅全文，故明确标为 **未取得全文**。S4 的官方 catalog 将第三版标为 `ISO 2110:1989`，另列 `Amd 1:1991`；V.28 (1993) 的注释只写无版次的 `ISO 2110`，不能据此把 1989/1991 文本倒灌给 IBM 1984 或更早设备。
 - S2/S3 是公开可读的国际规范，能先建立功能与电气骨架；它们不是把 S1 悄悄替换掉的借口。
 - IBM 扫描的页码使用书内印刷页码，而不是 PDF viewer 的文件页序号。
 
@@ -236,7 +237,7 @@ USB bridge 可能省略 modem-control lines、使用不同 transceiver、做 buf
 ### Gate 1 — 必须先补齐
 
 - [ ] 合法取得并审阅 TIA-232-F 全文，记录版次、clauses 与勘误/重申状态；
-- [ ] 合法取得并审阅 ISO/IEC 2110 对 25-contact connector/contact assignments 的全文；
+- [ ] 合法取得并审阅 ISO 2110 的相关版次：以 1989 第三版及 Amd 1:1991 核对 V.28-era mapping；若比较 IBM 1984，则另查当时有效的 1980 第二版，不能以后版倒灌；
 - [ ] 找到 IBM 9-contact serial implementation 的原厂 technical reference，用来交叉核验 S8；
 - [ ] 把 RS-232C、EIA-232-D、TIA/EIA-232-E/F 的版本变化做成单独表，不把后版条文倒灌给 1981 设备。
 
