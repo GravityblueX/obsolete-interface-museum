@@ -11,7 +11,7 @@
 
 ## Phase 1 — RS-232
 
-- [ ] 原始/同期资料 source map；
+- [x] 原始/同期资料 source map（见 [`research/rs232-source-map.md`](research/rs232-source-map.md)）；
 - [ ] 标准与常见 DE-9/DB-25 映射分开；
 - [ ] DTE/DCE；
 - [ ] TX/RX/GND 与 modem control；
