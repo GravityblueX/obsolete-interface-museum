@@ -26,10 +26,11 @@ HTML_PROCESSING_INSTRUCTION_START = re.compile(r"^ {0,3}<\?")
 HTML_DECLARATION_START = re.compile(r"^ {0,3}<![A-Z]")
 HTML_CDATA_START = re.compile(r"^ {0,3}<!\[CDATA\[")
 RAW_HTML_START = re.compile(
-    r"^ {0,3}<(pre|script|style|textarea)(?:[ \t>]|$)", re.IGNORECASE
+    r"^ {0,3}<(pre|script|style|textarea)(?:[ \t>]|$)",
+    re.IGNORECASE | re.ASCII,
 )
 RAW_HTML_END = re.compile(
-    r"</(?:pre|script|style|textarea)[ \t]*>", re.IGNORECASE
+    r"</(?:pre|script|style|textarea)>", re.IGNORECASE | re.ASCII
 )
 
 
@@ -59,6 +60,16 @@ def _source_declaration(line: str) -> tuple[str, bool] | None:
 def _is_formal_block_boundary(source_lines: list[str], line_number: int) -> bool:
     return line_number == 1 or bool(
         ASCII_BLANK.fullmatch(source_lines[line_number - 2])
+    )
+
+
+def _is_unambiguous_block_opener(
+    source_lines: list[str], line_number: int, line: str
+) -> bool:
+    if line_number == 1:
+        return True
+    return not line.startswith(" ") and _is_formal_block_boundary(
+        source_lines, line_number
     )
 
 
@@ -124,8 +135,8 @@ def _source_declarations(
             fence_character = marker[0]
             fence_length = len(marker)
             fence_opener_line = line_number
-            fence_is_ambiguous = not _is_formal_block_boundary(
-                source_lines, line_number
+            fence_is_ambiguous = not _is_unambiguous_block_opener(
+                source_lines, line_number, line
             )
             continue
 
@@ -133,8 +144,8 @@ def _source_declarations(
             if "-->" not in line:
                 html_end = re.compile(r"-->")
                 html_opener_line = line_number
-                html_is_ambiguous = not _is_formal_block_boundary(
-                    source_lines, line_number
+                html_is_ambiguous = not _is_unambiguous_block_opener(
+                    source_lines, line_number, line
                 )
             continue
 
@@ -142,8 +153,8 @@ def _source_declarations(
             if "?>" not in line:
                 html_end = re.compile(r"\?>")
                 html_opener_line = line_number
-                html_is_ambiguous = not _is_formal_block_boundary(
-                    source_lines, line_number
+                html_is_ambiguous = not _is_unambiguous_block_opener(
+                    source_lines, line_number, line
                 )
             continue
 
@@ -151,8 +162,8 @@ def _source_declarations(
             if "]]>" not in line:
                 html_end = re.compile(r"\]\]>")
                 html_opener_line = line_number
-                html_is_ambiguous = not _is_formal_block_boundary(
-                    source_lines, line_number
+                html_is_ambiguous = not _is_unambiguous_block_opener(
+                    source_lines, line_number, line
                 )
             continue
 
@@ -160,8 +171,8 @@ def _source_declarations(
             if ">" not in line:
                 html_end = re.compile(r">")
                 html_opener_line = line_number
-                html_is_ambiguous = not _is_formal_block_boundary(
-                    source_lines, line_number
+                html_is_ambiguous = not _is_unambiguous_block_opener(
+                    source_lines, line_number, line
                 )
             continue
 
@@ -170,8 +181,8 @@ def _source_declarations(
             if not RAW_HTML_END.search(line):
                 html_end = RAW_HTML_END
                 html_opener_line = line_number
-                html_is_ambiguous = not _is_formal_block_boundary(
-                    source_lines, line_number
+                html_is_ambiguous = not _is_unambiguous_block_opener(
+                    source_lines, line_number, line
                 )
             continue
 
@@ -237,7 +248,8 @@ def _declared_source_ids(
         errors.append(
             f"{relative_source_path}:{line_number}: source-like heading {source_id} "
             f"is inside an ambiguous Markdown block opened at line {opener_line}; "
-            "precede the block opener with an ASCII space/tab-only blank line"
+            "start the block opener at column one after an ASCII space/tab-only "
+            "blank line, or at the first line of the file"
         )
 
     for source_id, line_number in declarations:

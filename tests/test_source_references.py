@@ -247,6 +247,86 @@ class SourceReferenceValidationTests(unittest.TestCase):
 
         self.assertEqual([], validate_repository(self.repository_root))
 
+    def test_type_one_end_tag_requires_exact_closing_syntax(self):
+        cases = {
+            "pre-space": ("SRC-484", "</pre >"),
+            "pre-tab": ("SRC-485", "</pre\t>"),
+            "script-space": ("SRC-486", "</script >"),
+        }
+        for name in sorted(cases):
+            source_id, invalid_end = cases[name]
+            self.write_exhibit(
+                name,
+                [[source_id]],
+                "<pre>\n\n"
+                "literal content\n"
+                f"{invalid_end}\n\n"
+                f"### {source_id} — Still raw HTML\n",
+            )
+
+        self.assertEqual(
+            [
+                f"exhibits/{name}/exhibit.json: relationships[0].evidence[0]: "
+                f'source ID "{source_id}" is not declared in '
+                f"exhibits/{name}/sources.md"
+                for name, (source_id, _) in sorted(cases.items())
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_raw_html_tag_matching_uses_ascii_case_folding(self):
+        unicode_lookalikes = {
+            "dotted-i": ("SRC-487", "<scrİpt>"),
+            "dotless-i": ("SRC-488", "<scrıpt>"),
+            "long-s": ("SRC-489", "<ſcript>"),
+        }
+        for name in sorted(unicode_lookalikes):
+            source_id, fake_opener = unicode_lookalikes[name]
+            self.write_exhibit(
+                name,
+                [],
+                f"### {source_id} — First manual\n\n"
+                f"{fake_opener}\n\n"
+                f"### {source_id} — Second manual\n",
+            )
+
+        self.write_exhibit(
+            "ascii-uppercase",
+            [["SRC-490"]],
+            "<SCRIPT>\n\n### SRC-490 — Literal heading\n",
+        )
+
+        self.assertEqual(
+            [
+                "exhibits/ascii-uppercase/exhibit.json: "
+                "relationships[0].evidence[0]: source ID \"SRC-490\" is not "
+                "declared in exhibits/ascii-uppercase/sources.md",
+                *[
+                    f"exhibits/{name}/sources.md:5: duplicate source ID {source_id}; "
+                    "first declared at line 1"
+                    for name, (source_id, _) in sorted(unicode_lookalikes.items())
+                ],
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_unicode_lookalike_does_not_end_raw_html_block(self):
+        self.write_exhibit(
+            "serial",
+            [["SRC-491"]],
+            "<pre>\n\n"
+            "</ſtyle>\n\n"
+            "### SRC-491 — Still raw HTML\n",
+        )
+
+        self.assertEqual(
+            [
+                "exhibits/serial/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-491" is not declared in exhibits/serial/sources.md'
+            ],
+            validate_repository(self.repository_root),
+        )
+
     def test_unicode_whitespace_does_not_create_a_formal_boundary(self):
         self.write_exhibit(
             "fence",
@@ -625,8 +705,59 @@ class SourceReferenceValidationTests(unittest.TestCase):
             [
                 f"exhibits/{name}/sources.md:6: source-like heading {source_id} "
                 "is inside an ambiguous Markdown block opened at line 4; "
-                "precede the block opener with an ASCII space/tab-only blank line"
+                "start the block opener at column one after an ASCII space/tab-only "
+                "blank line, or at the first line of the file"
                 for name, (source_id, _) in sorted(cases.items())
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_indented_openers_after_list_blanks_fail_closed(self):
+        cases = {
+            "fence": ("SRC-480", "  ```markdown\n"),
+            "raw-html": ("SRC-481", "  <pre>\n"),
+        }
+        for name in sorted(cases):
+            source_id, opener = cases[name]
+            self.write_exhibit(
+                name,
+                [],
+                f"### {source_id} — First manual\n\n"
+                "- list item\n\n"
+                f"{opener}\n"
+                f"### {source_id} — Second manual\n",
+            )
+
+        self.assertEqual(
+            [
+                f"exhibits/{name}/sources.md:7: source-like heading {source_id} "
+                "is inside an ambiguous Markdown block opened at line 5; "
+                "start the block opener at column one after an ASCII space/tab-only "
+                "blank line, or at the first line of the file"
+                for name, (source_id, _) in sorted(cases.items())
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_indented_openers_at_bof_still_suppress_literal_headings(self):
+        self.write_exhibit(
+            "fence",
+            [["SRC-482"]],
+            "  ```markdown\n\n### SRC-482 — Literal heading\n",
+        )
+        self.write_exhibit(
+            "raw-html",
+            [["SRC-483"]],
+            "  <pre>\n\n### SRC-483 — Literal heading\n",
+        )
+
+        self.assertEqual(
+            [
+                "exhibits/fence/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-482" is not declared in exhibits/fence/sources.md',
+                "exhibits/raw-html/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-483" is not declared in '
+                "exhibits/raw-html/sources.md",
             ],
             validate_repository(self.repository_root),
         )
