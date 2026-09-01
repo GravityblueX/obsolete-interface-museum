@@ -11,22 +11,72 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DECLARATION = re.compile(
-    r"^ {0,3}###[ \t]+(SRC-[0-9]+)[ \t]+—[ \t]+\S.*$"
+    r"^###[ \t]+(SRC-[0-9]{3})[ \t]+—[ \t]+([^\n]+)$"
 )
+INLINE_HTML_COMMENT = re.compile(r"<!--.*?(?:-->|$)")
+INLINE_HTML_TAG = re.compile(
+    r"</?[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[^<>]*)?/?>"
+)
+CLOSING_HEADING_HASHES = re.compile(r"(?:^|[ \t]+)#+[ \t]*$")
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+HTML_COMMENT_START = re.compile(r"^ {0,3}<!--")
+HTML_PROCESSING_INSTRUCTION_START = re.compile(r"^ {0,3}<\?")
+HTML_DECLARATION_START = re.compile(r"^ {0,3}<![A-Z]")
+HTML_CDATA_START = re.compile(r"^ {0,3}<!\[CDATA\[")
+RAW_HTML_START = re.compile(
+    r"^ {0,3}<(pre|script|style|textarea)(?:[ \t>]|$)", re.IGNORECASE
+)
+HTML_BLOCK_START = re.compile(
+    r"^ {0,3}</?(?:address|article|aside|base|basefont|blockquote|body|caption|"
+    r"center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|"
+    r"figure|footer|form|frame|frameset|h[1-6]|head|header|hgroup|hr|html|"
+    r"iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|"
+    r"param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|"
+    r"track|ul)(?:[ \t]|/?>|$)",
+    re.IGNORECASE,
+)
+GENERIC_HTML_TAG = re.compile(
+    r"^ {0,3}</?[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[^<>]*)?/?>[ \t]*$"
+)
 
 
 def _relative_path(repository_root: Path, path: Path) -> str:
     return path.relative_to(repository_root).as_posix()
 
 
+def _fence_match(line: str) -> re.Match[str] | None:
+    match = FENCE.match(line)
+    if match is None:
+        return None
+    marker, remainder = match.groups()
+    if marker[0] == "`" and "`" in remainder:
+        return None
+    return match
+
+
+def _source_declaration(line: str) -> str | None:
+    match = SOURCE_DECLARATION.match(line)
+    if match is None:
+        return None
+
+    source_id, title = match.groups()
+    visible_title = INLINE_HTML_COMMENT.sub("", title)
+    visible_title = INLINE_HTML_TAG.sub("", visible_title)
+    visible_title = CLOSING_HEADING_HASHES.sub("", visible_title)
+    if not any(character.isalnum() for character in visible_title):
+        return None
+    return source_id
+
+
 def _source_declarations(source_text: str) -> list[tuple[str, int]]:
     declarations: list[tuple[str, int]] = []
     fence_character: str | None = None
     fence_length = 0
+    html_end: re.Pattern[str] | None = None
+    html_until_blank = False
 
-    for line_number, line in enumerate(source_text.splitlines(), start=1):
-        fence_match = FENCE.match(line)
+    for line_number, line in enumerate(source_text.split("\n"), start=1):
+        fence_match = _fence_match(line)
         if fence_character is not None:
             if fence_match:
                 marker, remainder = fence_match.groups()
@@ -39,15 +89,59 @@ def _source_declarations(source_text: str) -> list[tuple[str, int]]:
                     fence_length = 0
             continue
 
+        if html_end is not None:
+            if html_end.search(line):
+                html_end = None
+            continue
+
+        if html_until_blank:
+            if not line.strip():
+                html_until_blank = False
+            continue
+
         if fence_match:
             marker, _ = fence_match.groups()
             fence_character = marker[0]
             fence_length = len(marker)
             continue
 
-        declaration_match = SOURCE_DECLARATION.match(line)
-        if declaration_match:
-            declarations.append((declaration_match.group(1), line_number))
+        if HTML_COMMENT_START.match(line):
+            if "-->" not in line:
+                html_end = re.compile(r"-->")
+            continue
+
+        if HTML_PROCESSING_INSTRUCTION_START.match(line):
+            if "?>" not in line:
+                html_end = re.compile(r"\?>")
+            continue
+
+        if HTML_CDATA_START.match(line):
+            if "]]>" not in line:
+                html_end = re.compile(r"\]\]>")
+            continue
+
+        if HTML_DECLARATION_START.match(line):
+            if ">" not in line:
+                html_end = re.compile(r">")
+            continue
+
+        raw_html_match = RAW_HTML_START.match(line)
+        if raw_html_match:
+            closing_tag = re.compile(
+                rf"</{re.escape(raw_html_match.group(1))}[ \t]*>",
+                re.IGNORECASE,
+            )
+            if not closing_tag.search(line):
+                html_end = closing_tag
+            continue
+
+        if HTML_BLOCK_START.match(line) or GENERIC_HTML_TAG.match(line):
+            html_until_blank = True
+            continue
+
+        source_id = _source_declaration(line)
+        if source_id is not None:
+            declarations.append((source_id, line_number))
 
     return declarations
 
@@ -56,6 +150,10 @@ def _declared_source_ids(
     repository_root: Path, source_path: Path
 ) -> tuple[set[str], list[str]]:
     relative_source_path = _relative_path(repository_root, source_path)
+    if source_path.is_symlink():
+        return set(), [
+            f"{relative_source_path}: symbolic-link source ledger is not allowed"
+        ]
     try:
         source_text = source_path.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -104,6 +202,12 @@ def validate_repository(repository_root: Path) -> list[str]:
             errors.append(f"{relative_exhibit_path}: cannot read metadata: {error}")
             continue
 
+        if not isinstance(document, dict):
+            errors.append(
+                f"{relative_exhibit_path}: top-level JSON value must be an object"
+            )
+            continue
+
         source_path = exhibit_path.with_name("sources.md")
         declared_source_ids, source_errors = _declared_source_ids(
             repository_root, source_path
@@ -128,7 +232,7 @@ def validate_repository(repository_root: Path) -> list[str]:
                 if source_id in declared_source_ids:
                     continue
 
-                displayed_source_id = json.dumps(source_id, ensure_ascii=False)
+                displayed_source_id = json.dumps(source_id)
                 errors.append(
                     f"{relative_exhibit_path}: "
                     f"relationships[{relationship_index}].evidence[{evidence_index}]: "

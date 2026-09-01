@@ -3,6 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -37,7 +38,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
         self.write_exhibit(
             "serial",
             [["SRC-001"]],
-            "# Sources\n\n### SRC-001 — Original manual\n",
+            "# Sources\n\n### SRC-001 — Original manual ###\n",
         )
 
         self.assertEqual([], validate_repository(self.repository_root))
@@ -53,6 +54,128 @@ class SourceReferenceValidationTests(unittest.TestCase):
             [
                 "exhibits/serial/exhibit.json: relationships[0].evidence[0]: "
                 'source ID "SRC-404" is not declared in exhibits/serial/sources.md'
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_container_fences_do_not_declare_source_ids(self):
+        self.write_exhibit(
+            "unordered",
+            [["SRC-404"]],
+            "# Sources\n\n"
+            "- ```markdown\n"
+            "  ### SRC-404 — Example heading\n"
+            "  ```\n",
+        )
+        self.write_exhibit(
+            "ordered",
+            [["SRC-405"]],
+            "# Sources\n\n"
+            "1. ~~~markdown\n"
+            "   ### SRC-405 — Example heading\n"
+            "   ~~~\n",
+        )
+
+        self.assertEqual(
+            [
+                "exhibits/ordered/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-405" is not declared in '
+                "exhibits/ordered/sources.md",
+                "exhibits/unordered/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-404" is not declared in '
+                "exhibits/unordered/sources.md",
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_html_blocks_do_not_declare_source_ids(self):
+        sources_by_exhibit = {
+            "comment": ("SRC-401", "<!--\n### SRC-401 — Disabled\n-->\n"),
+            "pre": ("SRC-402", "<pre>\n### SRC-402 — Literal\n</pre>\n"),
+            "div": ("SRC-403", "<div>\n### SRC-403 — Literal\n</div>\n"),
+            "hgroup": (
+                "SRC-404",
+                "<hgroup>block text\n### SRC-404 — Literal\n</hgroup>\n",
+            ),
+        }
+        for name, (source_id, sources) in sources_by_exhibit.items():
+            self.write_exhibit(name, [[source_id]], sources)
+
+        self.assertEqual(
+            [
+                "exhibits/comment/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-401" is not declared in '
+                "exhibits/comment/sources.md",
+                "exhibits/div/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-403" is not declared in exhibits/div/sources.md',
+                "exhibits/hgroup/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-404" is not declared in '
+                "exhibits/hgroup/sources.md",
+                "exhibits/pre/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-402" is not declared in exhibits/pre/sources.md',
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_hidden_heading_does_not_create_duplicate_source_id(self):
+        self.write_exhibit(
+            "serial",
+            [["SRC-001"]],
+            "# Sources\n\n"
+            "### SRC-001 — Real manual\n\n"
+            "<!--\n"
+            "### SRC-001 — Disabled duplicate\n"
+            "-->\n",
+        )
+
+        self.assertEqual([], validate_repository(self.repository_root))
+
+    def test_unicode_line_separator_does_not_start_markdown_heading(self):
+        self.write_exhibit(
+            "serial",
+            [["SRC-404"]],
+            "Prose before\u2028### SRC-404 — Not an ATX line\n",
+        )
+
+        self.assertEqual(
+            [
+                "exhibits/serial/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-404" is not declared in exhibits/serial/sources.md'
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_backtick_in_info_string_does_not_open_fence(self):
+        self.write_exhibit(
+            "serial",
+            [["SRC-001"]],
+            "```foo`bar\n"
+            "### SRC-001 — Real manual\n"
+            "```\n",
+        )
+
+        self.assertEqual([], validate_repository(self.repository_root))
+
+    def test_source_heading_requires_three_digit_id_and_meaningful_title(self):
+        self.write_exhibit(
+            "serial",
+            [["SRC-1", "SRC-0001", "SRC-404", "SRC-405"]],
+            "### SRC-1 — Short ID\n"
+            "### SRC-0001 — Long ID\n"
+            "### SRC-404 — ###\n"
+            "### SRC-405 — <!-- hidden title -->\n",
+        )
+
+        self.assertEqual(
+            [
+                "exhibits/serial/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-1" is not declared in exhibits/serial/sources.md',
+                "exhibits/serial/exhibit.json: relationships[0].evidence[1]: "
+                'source ID "SRC-0001" is not declared in exhibits/serial/sources.md',
+                "exhibits/serial/exhibit.json: relationships[0].evidence[2]: "
+                'source ID "SRC-404" is not declared in exhibits/serial/sources.md',
+                "exhibits/serial/exhibit.json: relationships[0].evidence[3]: "
+                'source ID "SRC-405" is not declared in exhibits/serial/sources.md',
             ],
             validate_repository(self.repository_root),
         )
@@ -77,20 +200,23 @@ class SourceReferenceValidationTests(unittest.TestCase):
         )
 
     def test_source_id_is_escaped_in_diagnostic(self):
+        unsafe_source_id = "SRC-404\ud800\u202e"
         self.write_exhibit(
             "serial",
-            [["SRC-404\nforged diagnostic"]],
+            [[unsafe_source_id]],
             "# Sources\n",
         )
 
+        errors = validate_repository(self.repository_root)
         self.assertEqual(
             [
                 "exhibits/serial/exhibit.json: relationships[0].evidence[0]: "
-                'source ID "SRC-404\\nforged diagnostic" is not declared in '
+                'source ID "SRC-404\\ud800\\u202e" is not declared in '
                 "exhibits/serial/sources.md"
             ],
-            validate_repository(self.repository_root),
+            errors,
         )
+        self.assertTrue(errors[0].isascii())
 
     def test_duplicate_formal_source_id_is_rejected(self):
         self.write_exhibit(
@@ -107,6 +233,59 @@ class SourceReferenceValidationTests(unittest.TestCase):
                 "first declared at line 3"
             ],
             validate_repository(self.repository_root),
+        )
+
+    def test_symbolic_link_source_ledger_is_rejected(self):
+        self.write_exhibit(
+            "alpha",
+            [],
+            "# Sources\n\n### SRC-001 — Alpha manual\n",
+        )
+        self.write_exhibit("beta", [["SRC-001"]], None)
+        source_link = self.repository_root / "exhibits" / "beta" / "sources.md"
+        try:
+            source_link.symlink_to(Path("../alpha/sources.md"))
+        except (NotImplementedError, OSError) as error:
+            self.skipTest(f"symbolic links are unavailable: {error}")
+
+        self.assertEqual(
+            [
+                "exhibits/beta/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-001" is not declared in exhibits/beta/sources.md',
+                "exhibits/beta/sources.md: symbolic-link source ledger is not allowed",
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_symbolic_link_policy_does_not_follow_ledger(self):
+        self.write_exhibit(
+            "serial",
+            [["SRC-001"]],
+            "# Sources\n\n### SRC-001 — Must not be read\n",
+        )
+        source_path = self.repository_root / "exhibits" / "serial" / "sources.md"
+        original_is_symlink = Path.is_symlink
+
+        def reports_only_source_ledger_as_symlink(path):
+            if path == source_path:
+                return True
+            return original_is_symlink(path)
+
+        with mock.patch.object(
+            Path,
+            "is_symlink",
+            autospec=True,
+            side_effect=reports_only_source_ledger_as_symlink,
+        ):
+            errors = validate_repository(self.repository_root)
+
+        self.assertEqual(
+            [
+                "exhibits/serial/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-001" is not declared in exhibits/serial/sources.md',
+                "exhibits/serial/sources.md: symbolic-link source ledger is not allowed",
+            ],
+            errors,
         )
 
     def test_source_ids_may_be_reused_by_different_exhibits(self):
@@ -158,6 +337,24 @@ class SourceReferenceValidationTests(unittest.TestCase):
 
     def test_checked_in_corpus_is_valid(self):
         self.assertEqual([], validate_repository(REPOSITORY_ROOT))
+
+    def test_non_object_metadata_has_stable_diagnostic(self):
+        for index, document in enumerate(([], None, "text", 42)):
+            exhibit_directory = self.repository_root / "exhibits" / f"case-{index}"
+            exhibit_directory.mkdir(parents=True)
+            (exhibit_directory / "exhibit.json").write_text(
+                json.dumps(document),
+                encoding="utf-8",
+            )
+
+        self.assertEqual(
+            [
+                f"exhibits/case-{index}/exhibit.json: "
+                "top-level JSON value must be an object"
+                for index in range(4)
+            ],
+            validate_repository(self.repository_root),
+        )
 
 
 if __name__ == "__main__":
