@@ -9,6 +9,13 @@ from jsonschema import Draft202012Validator
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = REPOSITORY_ROOT / "schemas" / "exhibit.schema.json"
 TEMPLATE_PATH = REPOSITORY_ROOT / "exhibits" / "_template" / "exhibit.json"
+RELATIONSHIP_LAYERS = {
+    "replaced-by": "ecosystem",
+    "compatible-with": "protocol",
+    "physically-similar": "physical",
+    "protocol-carried-over": "protocol",
+    "electrically-related": "electrical",
+}
 
 
 def load_json(path):
@@ -51,16 +58,18 @@ class ExhibitSchemaRegressionTests(unittest.TestCase):
             f"expected relationships[0] to require {field!r}; got {errors!r}",
         )
 
-    def compatible_relationship(self):
-        return {
-            "type": "compatible-with",
+    def relationship(self, relationship_type):
+        relationship = {
+            "type": relationship_type,
             "target": "peer-interface",
-            "layer": "protocol",
+            "layer": RELATIONSHIP_LAYERS[relationship_type],
             "scope": "limited mode only",
             "requires": [],
-            "direction": "bidirectional",
             "evidence": ["SRC-001"],
         }
+        if relationship_type == "compatible-with":
+            relationship["direction"] = "bidirectional"
+        return relationship
 
     def test_schema_declares_draft_2020_12(self):
         self.assertEqual(
@@ -79,23 +88,52 @@ class ExhibitSchemaRegressionTests(unittest.TestCase):
             with self.subTest(path=exhibit_path.relative_to(REPOSITORY_ROOT)):
                 self.assert_valid(load_json(exhibit_path))
 
-    def test_complete_compatible_relationship_validates(self):
-        self.assert_valid(
-            self.document_with_relationship(self.compatible_relationship())
+    def test_compatible_relationship_accepts_meaningful_directions(self):
+        for direction in ("one-way", "bidirectional", "unknown"):
+            relationship = self.relationship("compatible-with")
+            relationship["direction"] = direction
+            with self.subTest(direction=direction):
+                self.assert_valid(self.document_with_relationship(relationship))
+
+    def test_all_relationship_types_require_shared_contract_fields(self):
+        for relationship_type in RELATIONSHIP_LAYERS:
+            for field in ("requires", "evidence"):
+                relationship = self.relationship(relationship_type)
+                del relationship[field]
+
+                with self.subTest(type=relationship_type, field=field):
+                    self.assert_missing_relationship_field(
+                        self.document_with_relationship(relationship), field
+                    )
+
+    def test_compatible_relationship_requires_direction(self):
+        relationship = self.relationship("compatible-with")
+        del relationship["direction"]
+        self.assert_missing_relationship_field(
+            self.document_with_relationship(relationship), "direction"
         )
 
-    def test_compatible_relationship_requires_contract_fields(self):
-        for field in ("requires", "direction", "evidence"):
-            relationship = self.compatible_relationship()
-            del relationship[field]
-
-            with self.subTest(field=field):
-                self.assert_missing_relationship_field(
-                    self.document_with_relationship(relationship), field
-                )
+    def test_compatible_relationship_rejects_not_applicable_direction(self):
+        relationship = self.relationship("compatible-with")
+        relationship["direction"] = "not-applicable"
+        errors = list(
+            self.validator.iter_errors(
+                self.document_with_relationship(relationship)
+            )
+        )
+        matching_errors = [
+            error
+            for error in errors
+            if error.validator == "enum"
+            and list(error.absolute_path) == ["relationships", 0, "direction"]
+        ]
+        self.assertTrue(
+            matching_errors,
+            f"expected compatible direction to be meaningful; got {errors!r}",
+        )
 
     def test_relationship_rejects_empty_evidence(self):
-        relationship = self.compatible_relationship()
+        relationship = self.relationship("compatible-with")
         relationship["evidence"] = []
         errors = list(
             self.validator.iter_errors(
@@ -113,39 +151,50 @@ class ExhibitSchemaRegressionTests(unittest.TestCase):
             f"expected relationships[0].evidence to be non-empty; got {errors!r}",
         )
 
-    def test_relationship_rejects_empty_contract_entries(self):
-        for field in ("requires", "evidence"):
-            relationship = self.compatible_relationship()
-            relationship[field] = [""]
-            errors = list(
-                self.validator.iter_errors(
-                    self.document_with_relationship(relationship)
-                )
+    def assert_contract_string_rejected(self, field, value, validator_name):
+        relationship = self.relationship("compatible-with")
+        if field in ("requires", "evidence"):
+            relationship[field] = [value]
+            expected_path = ["relationships", 0, field, 0]
+        else:
+            relationship[field] = value
+            expected_path = ["relationships", 0, field]
+
+        errors = list(
+            self.validator.iter_errors(
+                self.document_with_relationship(relationship)
             )
-            matching_errors = [
-                error
-                for error in errors
-                if error.validator == "minLength"
-                and list(error.absolute_path)
-                == ["relationships", 0, field, 0]
-            ]
+        )
+        matching_errors = [
+            error
+            for error in errors
+            if error.validator == validator_name
+            and list(error.absolute_path) == expected_path
+        ]
+        self.assertTrue(
+            matching_errors,
+            f"expected {field!r} value {value!r} to fail; got {errors!r}",
+        )
 
+    def test_relationship_rejects_empty_contract_strings(self):
+        for field in ("target", "scope", "requires", "evidence"):
             with self.subTest(field=field):
-                self.assertTrue(
-                    matching_errors,
-                    f"expected an empty {field!r} entry to fail; got {errors!r}",
-                )
+                self.assert_contract_string_rejected(field, "", "minLength")
 
-    def test_non_compatible_relationship_does_not_require_direction(self):
-        relationship = {
-            "type": "replaced-by",
-            "target": "successor-interface",
-            "layer": "ecosystem",
-            "scope": "general-purpose host use",
-            "requires": [],
-            "evidence": ["SRC-002"],
-        }
-        self.assert_valid(self.document_with_relationship(relationship))
+    def test_relationship_rejects_whitespace_contract_strings(self):
+        for field in ("target", "scope", "requires", "evidence"):
+            with self.subTest(field=field):
+                self.assert_contract_string_rejected(field, " \t ", "pattern")
+
+    def test_non_compatible_relationships_do_not_require_direction(self):
+        relationship_types = set(RELATIONSHIP_LAYERS) - {"compatible-with"}
+        for relationship_type in sorted(relationship_types):
+            with self.subTest(type=relationship_type):
+                self.assert_valid(
+                    self.document_with_relationship(
+                        self.relationship(relationship_type)
+                    )
+                )
 
 
 if __name__ == "__main__":
