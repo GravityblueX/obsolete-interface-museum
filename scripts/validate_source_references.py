@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+from html import unescape
 from pathlib import Path
 
 
@@ -14,17 +15,34 @@ SOURCE_DECLARATION = re.compile(
     r"^###[ \t]+(SRC-[0-9]{3})[ \t]+—[ \t]+([^\n]+)$"
 )
 INLINE_HTML_COMMENT = re.compile(r"<!--.*?(?:-->|$)")
-INLINE_HTML_TAG = re.compile(
-    r"</?[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[^<>]*)?/?>"
-)
 CLOSING_HEADING_HASHES = re.compile(r"(?:^|[ \t]+)#+[ \t]*$")
+TAG_NAME = r"[A-Za-z][A-Za-z0-9-]*"
+ATTRIBUTE_NAME = r"[A-Za-z_:][A-Za-z0-9_.:-]*"
+ATTRIBUTE_VALUE = r'''(?:[^ "'=<>`]+|'[^']*'|"[^"]*")'''
+ATTRIBUTE = rf"(?:[ \t]+{ATTRIBUTE_NAME}(?:[ \t]*=[ \t]*{ATTRIBUTE_VALUE})?)"
+HTML_OPEN_TAG = re.compile(
+    rf"^ {{0,3}}<{TAG_NAME}(?:{ATTRIBUTE})*[ \t]*/?>[ \t]*$"
+)
+HTML_CLOSING_TAG = re.compile(rf"^ {{0,3}}</{TAG_NAME}[ \t]*>[ \t]*$")
+INLINE_HTML_TAG = re.compile(
+    rf"</?{TAG_NAME}(?:{ATTRIBUTE})*[ \t]*/?>"
+)
+INLINE_LINK = re.compile(
+    r"!?\[([^\]\n]*)\]\((?:[^()\n]|\([^()\n]*\))*\)"
+)
+REFERENCE_LINK = re.compile(r"!?\[([^\]\n]*)\]\[[^\]\n]*\]")
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+ASCII_BLANK = re.compile(r"^[ \t]*$")
+ATX_HEADING = re.compile(r"^ {0,3}#{1,6}(?:[ \t]+|$)")
 HTML_COMMENT_START = re.compile(r"^ {0,3}<!--")
 HTML_PROCESSING_INSTRUCTION_START = re.compile(r"^ {0,3}<\?")
 HTML_DECLARATION_START = re.compile(r"^ {0,3}<![A-Z]")
 HTML_CDATA_START = re.compile(r"^ {0,3}<!\[CDATA\[")
 RAW_HTML_START = re.compile(
     r"^ {0,3}<(pre|script|style|textarea)(?:[ \t>]|$)", re.IGNORECASE
+)
+RAW_HTML_END = re.compile(
+    r"</(?:pre|script|style|textarea)[ \t]*>", re.IGNORECASE
 )
 HTML_BLOCK_START = re.compile(
     r"^ {0,3}</?(?:address|article|aside|base|basefont|blockquote|body|caption|"
@@ -34,9 +52,6 @@ HTML_BLOCK_START = re.compile(
     r"param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|"
     r"track|ul)(?:[ \t]|/?>|$)",
     re.IGNORECASE,
-)
-GENERIC_HTML_TAG = re.compile(
-    r"^ {0,3}</?[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[^<>]*)?/?>[ \t]*$"
 )
 
 
@@ -61,7 +76,10 @@ def _source_declaration(line: str) -> str | None:
 
     source_id, title = match.groups()
     visible_title = INLINE_HTML_COMMENT.sub("", title)
+    visible_title = INLINE_LINK.sub(lambda link: link.group(1), visible_title)
+    visible_title = REFERENCE_LINK.sub(lambda link: link.group(1), visible_title)
     visible_title = INLINE_HTML_TAG.sub("", visible_title)
+    visible_title = unescape(visible_title)
     visible_title = CLOSING_HEADING_HASHES.sub("", visible_title)
     if not any(character.isalnum() for character in visible_title):
         return None
@@ -74,8 +92,10 @@ def _source_declarations(source_text: str) -> list[tuple[str, int]]:
     fence_length = 0
     html_end: re.Pattern[str] | None = None
     html_until_blank = False
+    paragraph_open = False
 
-    for line_number, line in enumerate(source_text.split("\n"), start=1):
+    normalized_source_text = source_text.replace("\r\n", "\n").replace("\r", "\n")
+    for line_number, line in enumerate(normalized_source_text.split("\n"), start=1):
         fence_match = _fence_match(line)
         if fence_character is not None:
             if fence_match:
@@ -83,7 +103,7 @@ def _source_declarations(source_text: str) -> list[tuple[str, int]]:
                 if (
                     marker[0] == fence_character
                     and len(marker) >= fence_length
-                    and not remainder.strip()
+                    and ASCII_BLANK.fullmatch(remainder)
                 ):
                     fence_character = None
                     fence_length = 0
@@ -95,53 +115,74 @@ def _source_declarations(source_text: str) -> list[tuple[str, int]]:
             continue
 
         if html_until_blank:
-            if not line.strip():
+            if ASCII_BLANK.fullmatch(line):
                 html_until_blank = False
+            continue
+
+        if ASCII_BLANK.fullmatch(line):
+            paragraph_open = False
             continue
 
         if fence_match:
             marker, _ = fence_match.groups()
             fence_character = marker[0]
             fence_length = len(marker)
+            paragraph_open = False
             continue
 
         if HTML_COMMENT_START.match(line):
             if "-->" not in line:
                 html_end = re.compile(r"-->")
+            paragraph_open = False
             continue
 
         if HTML_PROCESSING_INSTRUCTION_START.match(line):
             if "?>" not in line:
                 html_end = re.compile(r"\?>")
+            paragraph_open = False
             continue
 
         if HTML_CDATA_START.match(line):
             if "]]>" not in line:
                 html_end = re.compile(r"\]\]>")
+            paragraph_open = False
             continue
 
         if HTML_DECLARATION_START.match(line):
             if ">" not in line:
                 html_end = re.compile(r">")
+            paragraph_open = False
             continue
 
         raw_html_match = RAW_HTML_START.match(line)
         if raw_html_match:
-            closing_tag = re.compile(
-                rf"</{re.escape(raw_html_match.group(1))}[ \t]*>",
-                re.IGNORECASE,
-            )
-            if not closing_tag.search(line):
-                html_end = closing_tag
+            if not RAW_HTML_END.search(line):
+                html_end = RAW_HTML_END
+            paragraph_open = False
             continue
 
-        if HTML_BLOCK_START.match(line) or GENERIC_HTML_TAG.match(line):
+        if HTML_BLOCK_START.match(line):
+            html_until_blank = True
+            paragraph_open = False
+            continue
+
+        if not paragraph_open and (
+            HTML_OPEN_TAG.match(line) or HTML_CLOSING_TAG.match(line)
+        ):
             html_until_blank = True
             continue
 
         source_id = _source_declaration(line)
         if source_id is not None:
             declarations.append((source_id, line_number))
+            paragraph_open = False
+            continue
+
+        if ATX_HEADING.match(line):
+            paragraph_open = False
+            continue
+
+        paragraph_open = True
 
     return declarations
 

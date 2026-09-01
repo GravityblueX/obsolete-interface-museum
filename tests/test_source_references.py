@@ -130,6 +130,120 @@ class SourceReferenceValidationTests(unittest.TestCase):
 
         self.assertEqual([], validate_repository(self.repository_root))
 
+    def test_generic_html_quoted_angles_hide_source_headings(self):
+        self.write_exhibit(
+            "greater",
+            [["SRC-404"]],
+            '<kbd title=\">\">\n### SRC-404 — Literal\n\n',
+        )
+        self.write_exhibit(
+            "less",
+            [["SRC-405"]],
+            '<kbd title=\"<\">\n### SRC-405 — Literal\n\n',
+        )
+
+        self.assertEqual(
+            [
+                "exhibits/greater/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-404" is not declared in '
+                "exhibits/greater/sources.md",
+                "exhibits/less/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-405" is not declared in exhibits/less/sources.md',
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_generic_html_does_not_interrupt_paragraph(self):
+        self.write_exhibit(
+            "serial",
+            [],
+            "### SRC-001 — First manual\n"
+            "Paragraph text\n"
+            "<kbd>\n"
+            "### SRC-001 — Second manual\n",
+        )
+
+        self.assertEqual(
+            [
+                "exhibits/serial/sources.md:4: duplicate source ID SRC-001; "
+                "first declared at line 1"
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_invalid_generic_html_does_not_hide_real_heading(self):
+        invalid_tags = {
+            "bad-attribute": "<kbd ???>",
+            "bad-closing": "</kbd attr=x>",
+            "missing-value": "<kbd title=>",
+        }
+        for index, (name, invalid_tag) in enumerate(invalid_tags.items(), start=1):
+            source_id = f"SRC-{413 + index:03d}"
+            self.write_exhibit(
+                name,
+                [[source_id]],
+                f"{invalid_tag}\n### {source_id} — Real manual\n",
+            )
+
+        self.assertEqual([], validate_repository(self.repository_root))
+
+    def test_any_type_one_end_tag_ends_raw_html_block(self):
+        self.write_exhibit(
+            "serial",
+            [["SRC-419"]],
+            "<pre>\n"
+            "</script>\n"
+            "### SRC-419 — Real manual\n",
+        )
+
+        self.assertEqual([], validate_repository(self.repository_root))
+
+    def test_unicode_whitespace_does_not_end_fence_or_html_block(self):
+        self.write_exhibit(
+            "fence",
+            [["SRC-407"]],
+            "```markdown\n"
+            "```\u00a0\n"
+            "### SRC-407 — Still fenced\n"
+            "```\n",
+        )
+        self.write_exhibit(
+            "html",
+            [["SRC-408"]],
+            "<div>\n"
+            "\u00a0\n"
+            "### SRC-408 — Still raw HTML\n"
+            "</div>\n",
+        )
+
+        self.assertEqual(
+            [
+                "exhibits/fence/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-407" is not declared in exhibits/fence/sources.md',
+                "exhibits/html/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-408" is not declared in exhibits/html/sources.md',
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_ascii_whitespace_ends_fence_and_html_block(self):
+        self.write_exhibit(
+            "fence",
+            [["SRC-420"]],
+            "```markdown\n"
+            "``` \t\n"
+            "### SRC-420 — Real manual\n",
+        )
+        self.write_exhibit(
+            "html",
+            [["SRC-421"]],
+            "<div>\n"
+            " \t\n"
+            "### SRC-421 — Real manual\n",
+        )
+
+        self.assertEqual([], validate_repository(self.repository_root))
+
     def test_unicode_line_separator_does_not_start_markdown_heading(self):
         self.write_exhibit(
             "serial",
@@ -159,11 +273,24 @@ class SourceReferenceValidationTests(unittest.TestCase):
     def test_source_heading_requires_three_digit_id_and_meaningful_title(self):
         self.write_exhibit(
             "serial",
-            [["SRC-1", "SRC-0001", "SRC-404", "SRC-405"]],
+            [
+                [
+                    "SRC-1",
+                    "SRC-0001",
+                    "SRC-404",
+                    "SRC-405",
+                    "SRC-409",
+                    "SRC-411",
+                    "SRC-412",
+                ]
+            ],
             "### SRC-1 — Short ID\n"
             "### SRC-0001 — Long ID\n"
             "### SRC-404 — ###\n"
-            "### SRC-405 — <!-- hidden title -->\n",
+            "### SRC-405 — <!-- hidden title -->\n"
+            "### SRC-409 — [](https://example.com)\n"
+            "### SRC-411 — &#32;\n"
+            "### SRC-412 — <span title=\">Manual\"></span>\n",
         )
 
         self.assertEqual(
@@ -176,6 +303,12 @@ class SourceReferenceValidationTests(unittest.TestCase):
                 'source ID "SRC-404" is not declared in exhibits/serial/sources.md',
                 "exhibits/serial/exhibit.json: relationships[0].evidence[3]: "
                 'source ID "SRC-405" is not declared in exhibits/serial/sources.md',
+                "exhibits/serial/exhibit.json: relationships[0].evidence[4]: "
+                'source ID "SRC-409" is not declared in exhibits/serial/sources.md',
+                "exhibits/serial/exhibit.json: relationships[0].evidence[5]: "
+                'source ID "SRC-411" is not declared in exhibits/serial/sources.md',
+                "exhibits/serial/exhibit.json: relationships[0].evidence[6]: "
+                'source ID "SRC-412" is not declared in exhibits/serial/sources.md',
             ],
             validate_repository(self.repository_root),
         )
