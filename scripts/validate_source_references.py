@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Validate relationship evidence against each exhibit's formal source ledger.
 
-A declaration starts at column one and must be the first line of the file or
-follow an ASCII space/tab-only blank line.  This deliberately conservative
-contract makes ambiguous Markdown placement fail closed without attempting to
-implement a complete Markdown block parser.
+A declaration uses ``### SRC-NNN — Title`` at column one, starts the title with
+a literal letter or number, and begins the file or follows an ASCII
+space/tab-only blank line.  This deliberately conservative contract makes
+ambiguous Markdown fail closed without implementing a Markdown parser.
 """
 
 from __future__ import annotations
@@ -12,27 +12,13 @@ from __future__ import annotations
 import json
 import re
 import sys
-from html import unescape
 from pathlib import Path
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DECLARATION = re.compile(
-    r"^###[ \t]+(SRC-[0-9]{3})[ \t]+—[ \t]+([^\n]+)$"
+    r"^###[ \t]+(SRC-[0-9]{3})[ \t]+—[ \t]+(.*)$"
 )
-INLINE_HTML_COMMENT = re.compile(r"<!--.*?(?:-->|$)")
-CLOSING_HEADING_HASHES = re.compile(r"(?:^|[ \t]+)#+[ \t]*$")
-TAG_NAME = r"[A-Za-z][A-Za-z0-9-]*"
-ATTRIBUTE_NAME = r"[A-Za-z_:][A-Za-z0-9_.:-]*"
-ATTRIBUTE_VALUE = r'''(?:[^ "'=<>`]+|'[^']*'|"[^"]*")'''
-ATTRIBUTE = rf"(?:[ \t]+{ATTRIBUTE_NAME}(?:[ \t]*=[ \t]*{ATTRIBUTE_VALUE})?)"
-INLINE_HTML_TAG = re.compile(
-    rf"</?{TAG_NAME}(?:{ATTRIBUTE})*[ \t]*/?>"
-)
-INLINE_LINK = re.compile(
-    r"!?\[([^\]\n]*)\]\((?:[^()\n]|\([^()\n]*\))*\)"
-)
-REFERENCE_LINK = re.compile(r"!?\[([^\]\n]*)\]\[[^\]\n]*\]")
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 ASCII_BLANK = re.compile(r"^[ \t]*$")
 HTML_COMMENT_START = re.compile(r"^ {0,3}<!--")
@@ -61,28 +47,25 @@ def _fence_match(line: str) -> re.Match[str] | None:
     return match
 
 
-def _source_declaration(line: str) -> str | None:
+def _source_declaration(line: str) -> tuple[str, bool] | None:
     match = SOURCE_DECLARATION.match(line)
     if match is None:
         return None
 
     source_id, title = match.groups()
-    visible_title = INLINE_HTML_COMMENT.sub("", title)
-    visible_title = INLINE_LINK.sub(lambda link: link.group(1), visible_title)
-    visible_title = REFERENCE_LINK.sub(lambda link: link.group(1), visible_title)
-    visible_title = INLINE_HTML_TAG.sub("", visible_title)
-    visible_title = unescape(visible_title)
-    visible_title = CLOSING_HEADING_HASHES.sub("", visible_title)
-    if not any(character.isalnum() for character in visible_title):
-        return None
-    return source_id
+    return source_id, bool(title) and title[0].isalnum()
 
 
 def _source_declarations(
     source_text: str,
-) -> tuple[list[tuple[str, int]], list[tuple[str, int]]]:
+) -> tuple[
+    list[tuple[str, int]],
+    list[tuple[str, int]],
+    list[tuple[str, int]],
+]:
     declarations: list[tuple[str, int]] = []
     misplaced_declarations: list[tuple[str, int]] = []
+    invalid_title_declarations: list[tuple[str, int]] = []
     fence_character: str | None = None
     fence_length = 0
     html_end: re.Pattern[str] | None = None
@@ -140,17 +123,20 @@ def _source_declarations(
                 html_end = RAW_HTML_END
             continue
 
-        source_id = _source_declaration(line)
-        if source_id is not None:
+        source_declaration = _source_declaration(line)
+        if source_declaration is not None:
+            source_id, title_is_valid = source_declaration
             previous_line_is_blank = line_number == 1 or bool(
                 ASCII_BLANK.fullmatch(source_lines[line_number - 2])
             )
-            destination = (
-                declarations if previous_line_is_blank else misplaced_declarations
-            )
-            destination.append((source_id, line_number))
+            if not previous_line_is_blank:
+                misplaced_declarations.append((source_id, line_number))
+            if not title_is_valid:
+                invalid_title_declarations.append((source_id, line_number))
+            if previous_line_is_blank and title_is_valid:
+                declarations.append((source_id, line_number))
 
-    return declarations, misplaced_declarations
+    return declarations, misplaced_declarations, invalid_title_declarations
 
 
 def _declared_source_ids(
@@ -170,12 +156,21 @@ def _declared_source_ids(
 
     first_declaration_lines: dict[str, int] = {}
     errors: list[str] = []
-    declarations, misplaced_declarations = _source_declarations(source_text)
+    declarations, misplaced_declarations, invalid_title_declarations = (
+        _source_declarations(source_text)
+    )
     for source_id, line_number in misplaced_declarations:
         errors.append(
             f"{relative_source_path}:{line_number}: source declaration {source_id} "
             "must be top-level at the start of a Markdown block; begin the file or "
             "precede it with an ASCII space/tab-only blank line"
+        )
+
+    for source_id, line_number in invalid_title_declarations:
+        errors.append(
+            f"{relative_source_path}:{line_number}: source declaration {source_id} "
+            "title must begin with a literal letter or number; Markdown/HTML-"
+            "prefixed titles are not supported"
         )
 
     for source_id, line_number in declarations:
@@ -193,7 +188,7 @@ def _declared_source_ids(
 
 
 def validate_repository(repository_root: Path) -> list[str]:
-    """Return stable diagnostics for dangling and duplicate source IDs."""
+    """Return stable diagnostics for invalid source ledgers and references."""
 
     repository_root = repository_root.resolve()
     exhibits_root = repository_root / "exhibits"

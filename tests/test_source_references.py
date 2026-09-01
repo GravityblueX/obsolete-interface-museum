@@ -45,6 +45,11 @@ class SourceReferenceValidationTests(unittest.TestCase):
             [["SRC-001"]],
             "# Sources\n \t\n### SRC-001 — Original manual ###\n",
         )
+        self.write_exhibit(
+            "unicode-title",
+            [["SRC-002"]],
+            "### SRC-002 — 原厂手册\n",
+        )
 
         self.assertEqual([], validate_repository(self.repository_root))
 
@@ -319,27 +324,12 @@ class SourceReferenceValidationTests(unittest.TestCase):
 
         self.assertEqual([], validate_repository(self.repository_root))
 
-    def test_source_heading_requires_three_digit_id_and_meaningful_title(self):
+    def test_source_heading_requires_three_digit_id(self):
         self.write_exhibit(
             "serial",
-            [
-                [
-                    "SRC-1",
-                    "SRC-0001",
-                    "SRC-404",
-                    "SRC-405",
-                    "SRC-409",
-                    "SRC-411",
-                    "SRC-412",
-                ]
-            ],
+            [["SRC-1", "SRC-0001"]],
             "### SRC-1 — Short ID\n"
-            "### SRC-0001 — Long ID\n"
-            "### SRC-404 — ###\n"
-            "### SRC-405 — <!-- hidden title -->\n"
-            "### SRC-409 — [](https://example.com)\n"
-            "### SRC-411 — &#32;\n"
-            "### SRC-412 — <span title=\">Manual\"></span>\n",
+            "### SRC-0001 — Long ID\n",
         )
 
         self.assertEqual(
@@ -348,19 +338,79 @@ class SourceReferenceValidationTests(unittest.TestCase):
                 'source ID "SRC-1" is not declared in exhibits/serial/sources.md',
                 "exhibits/serial/exhibit.json: relationships[0].evidence[1]: "
                 'source ID "SRC-0001" is not declared in exhibits/serial/sources.md',
-                "exhibits/serial/exhibit.json: relationships[0].evidence[2]: "
-                'source ID "SRC-404" is not declared in exhibits/serial/sources.md',
-                "exhibits/serial/exhibit.json: relationships[0].evidence[3]: "
-                'source ID "SRC-405" is not declared in exhibits/serial/sources.md',
-                "exhibits/serial/exhibit.json: relationships[0].evidence[4]: "
-                'source ID "SRC-409" is not declared in exhibits/serial/sources.md',
-                "exhibits/serial/exhibit.json: relationships[0].evidence[5]: "
-                'source ID "SRC-411" is not declared in exhibits/serial/sources.md',
-                "exhibits/serial/exhibit.json: relationships[0].evidence[6]: "
-                'source ID "SRC-412" is not declared in exhibits/serial/sources.md',
             ],
             validate_repository(self.repository_root),
         )
+
+    def test_source_title_must_begin_with_literal_alphanumeric_text(self):
+        cases = {
+            "cdata": ("SRC-452", "<![CDATA[Manual]]>"),
+            "closing-hashes": ("SRC-404", "###"),
+            "code-span": ("SRC-454", "`<kbd>`"),
+            "comment": ("SRC-405", "<!-- hidden title -->"),
+            "declaration": ("SRC-451", "<!DOCTYPE html>"),
+            "emphasis": ("SRC-455", "*Manual*"),
+            "empty-inline-link": ("SRC-409", "[](https://example.com)"),
+            "empty-span": ("SRC-412", '<span title=">Manual"></span>'),
+            "empty-title": ("SRC-458", ""),
+            "entity": ("SRC-411", "&#32;"),
+            "escaped-link-label": ("SRC-453", r"[\]](https://example.com)"),
+            "processing-instruction": ("SRC-450", "<?target data?>"),
+        }
+        for name in sorted(cases):
+            source_id, title = cases[name]
+            self.write_exhibit(
+                name,
+                [[source_id]],
+                f"### {source_id} — {title}\n",
+            )
+
+        expected = []
+        for name in sorted(cases):
+            source_id, _ = cases[name]
+            expected.extend(
+                [
+                    f"exhibits/{name}/exhibit.json: "
+                    "relationships[0].evidence[0]: "
+                    f'source ID "{source_id}" is not declared in '
+                    f"exhibits/{name}/sources.md",
+                    f"exhibits/{name}/sources.md:1: source declaration {source_id} "
+                    "title must begin with a literal letter or number; "
+                    "Markdown/HTML-prefixed titles are not supported",
+                ]
+            )
+
+        self.assertEqual(expected, validate_repository(self.repository_root))
+
+    def test_invalid_title_and_placement_are_both_reported(self):
+        self.write_exhibit(
+            "serial",
+            [["SRC-456"]],
+            "Paragraph text\n### SRC-456 — `Manual`\n",
+        )
+
+        self.assertEqual(
+            [
+                "exhibits/serial/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-456" is not declared in exhibits/serial/sources.md',
+                "exhibits/serial/sources.md:2: source declaration SRC-456 must be "
+                "top-level at the start of a Markdown block; begin the file or "
+                "precede it with an ASCII space/tab-only blank line",
+                "exhibits/serial/sources.md:2: source declaration SRC-456 title "
+                "must begin with a literal letter or number; "
+                "Markdown/HTML-prefixed titles are not supported",
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_literal_title_prefix_may_be_followed_by_markup(self):
+        self.write_exhibit(
+            "serial",
+            [["SRC-457"]],
+            "### SRC-457 — Original manual <?target data?> `<kbd>`\n",
+        )
+
+        self.assertEqual([], validate_repository(self.repository_root))
 
     def test_prose_and_fenced_examples_are_not_declarations(self):
         self.write_exhibit(

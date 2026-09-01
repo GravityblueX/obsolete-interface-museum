@@ -4,7 +4,11 @@ Use stable source IDs so claims in other exhibit files can point here.
 
 ## Source ledger
 
-### SRC-001 — <title>
+Source entries are machine-checked. Start each `### SRC-NNN — Title` heading at
+column one after an empty line, and begin `Title` with a literal letter or number
+rather than Markdown or HTML.
+
+### SRC-001 — Source title
 
 - **Evidence level:** E1 / E2 / E3 / E4 / E5
 - **Author / organization:**
