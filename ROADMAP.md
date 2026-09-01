@@ -30,6 +30,7 @@
 
 重点：
 
+- [x] 原始/同期资料 source map（见 [`research/rs232-source-map.md`](research/rs232-source-map.md)）；
 - [ ] 标准与常见 DE-9/DB-25 映射区分；
 - [ ] TX/RX/GND 与 RTS/CTS、DTR/DSR；
 - [ ] DTE / DCE；
@@ -159,7 +160,7 @@ uncertainty
 
 ### Task B — RS-232 资料审查
 
-先定位 EIA/TIA/厂商技术资料、IBM PC 串口资料、pinouts.ru 和 OSDev；输出 `research/rs232-source-map.md`，标注证据等级和冲突点。
+已完成：[`research/rs232-source-map.md`](research/rs232-source-map.md) 已定位 EIA/TIA/ITU、厂商技术资料、IBM PC 串口资料、pinoutguide/pinouts.ru 和 OSDev，并标注证据等级、全文缺口和冲突点。
 
 ### Task C — PS/2 历史链
 
