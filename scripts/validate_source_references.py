@@ -9,6 +9,7 @@ ambiguous Markdown fail closed without implementing a Markdown parser.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import re
 import sys
@@ -32,6 +33,14 @@ RAW_HTML_START = re.compile(
 RAW_HTML_END = re.compile(
     r"</(?:pre|script|style|textarea)>", re.IGNORECASE | re.ASCII
 )
+
+
+@dataclass(frozen=True)
+class _Diagnostic:
+    path: str
+    location: tuple[int, ...]
+    kind: int
+    message: str
 
 
 def _relative_path(repository_root: Path, path: Path) -> str:
@@ -212,21 +221,33 @@ def _source_declarations(
 
 def _declared_source_ids(
     repository_root: Path, source_path: Path
-) -> tuple[set[str], list[str]]:
+) -> tuple[set[str], list[_Diagnostic]]:
     relative_source_path = _relative_path(repository_root, source_path)
     if source_path.is_symlink():
         return set(), [
-            f"{relative_source_path}: symbolic-link source ledger is not allowed"
+            _Diagnostic(
+                relative_source_path,
+                (),
+                0,
+                f"{relative_source_path}: symbolic-link source ledger is not allowed",
+            )
         ]
     try:
         source_text = source_path.read_text(encoding="utf-8")
     except FileNotFoundError:
         return set(), []
     except (OSError, UnicodeError) as error:
-        return set(), [f"{relative_source_path}: cannot read source ledger: {error}"]
+        return set(), [
+            _Diagnostic(
+                relative_source_path,
+                (),
+                0,
+                f"{relative_source_path}: cannot read source ledger: {error}",
+            )
+        ]
 
     first_declaration_lines: dict[str, int] = {}
-    errors: list[str] = []
+    diagnostics: list[_Diagnostic] = []
     (
         declarations,
         misplaced_declarations,
@@ -234,25 +255,42 @@ def _declared_source_ids(
         ambiguous_block_declarations,
     ) = _source_declarations(source_text)
     for source_id, line_number in misplaced_declarations:
-        errors.append(
-            f"{relative_source_path}:{line_number}: source declaration {source_id} "
-            "must be top-level at the start of a Markdown block; begin the file or "
-            "precede it with an ASCII space/tab-only blank line"
+        diagnostics.append(
+            _Diagnostic(
+                relative_source_path,
+                (line_number,),
+                0,
+                f"{relative_source_path}:{line_number}: source declaration "
+                f"{source_id} must be top-level at the start of a Markdown block; "
+                "begin the file or precede it with an ASCII space/tab-only blank "
+                "line",
+            )
         )
 
     for source_id, line_number in invalid_title_declarations:
-        errors.append(
-            f"{relative_source_path}:{line_number}: source declaration {source_id} "
-            "title must begin with a literal letter or number; Markdown/HTML-"
-            "prefixed titles are not supported"
+        diagnostics.append(
+            _Diagnostic(
+                relative_source_path,
+                (line_number,),
+                1,
+                f"{relative_source_path}:{line_number}: source declaration "
+                f"{source_id} title must begin with a literal letter or number; "
+                "Markdown/HTML-prefixed titles are not supported",
+            )
         )
 
     for source_id, line_number, opener_line in ambiguous_block_declarations:
-        errors.append(
-            f"{relative_source_path}:{line_number}: source-like heading {source_id} "
-            f"is inside an ambiguous Markdown block opened at line {opener_line}; "
-            "start the block opener at column one after an ASCII space/tab-only "
-            "blank line, or at the first line of the file"
+        diagnostics.append(
+            _Diagnostic(
+                relative_source_path,
+                (line_number,),
+                2,
+                f"{relative_source_path}:{line_number}: source-like heading "
+                f"{source_id} is inside an ambiguous Markdown block opened at "
+                f"line {opener_line}; start the block opener at column one after "
+                "an ASCII space/tab-only blank line, or at the first line of the "
+                "file",
+            )
         )
 
     for source_id, line_number in declarations:
@@ -261,12 +299,17 @@ def _declared_source_ids(
             first_declaration_lines[source_id] = line_number
             continue
 
-        errors.append(
-            f"{relative_source_path}:{line_number}: duplicate source ID {source_id}; "
-            f"first declared at line {first_line}"
+        diagnostics.append(
+            _Diagnostic(
+                relative_source_path,
+                (line_number,),
+                3,
+                f"{relative_source_path}:{line_number}: duplicate source ID "
+                f"{source_id}; first declared at line {first_line}",
+            )
         )
 
-    return set(first_declaration_lines), errors
+    return set(first_declaration_lines), diagnostics
 
 
 def validate_repository(repository_root: Path) -> list[str]:
@@ -278,25 +321,43 @@ def validate_repository(repository_root: Path) -> list[str]:
         exhibits_root.rglob("exhibit.json"),
         key=lambda path: _relative_path(repository_root, path),
     )
-    errors: list[str] = []
+    diagnostics: list[_Diagnostic] = []
 
     for exhibit_path in exhibit_paths:
         relative_exhibit_path = _relative_path(repository_root, exhibit_path)
         try:
             document = json.loads(exhibit_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as error:
-            errors.append(
-                f"{relative_exhibit_path}:{error.lineno}:{error.colno}: invalid JSON: "
-                f"{error.msg}"
+            diagnostics.append(
+                _Diagnostic(
+                    relative_exhibit_path,
+                    (),
+                    0,
+                    f"{relative_exhibit_path}:{error.lineno}:{error.colno}: "
+                    f"invalid JSON: {error.msg}",
+                )
             )
             continue
         except (OSError, UnicodeError) as error:
-            errors.append(f"{relative_exhibit_path}: cannot read metadata: {error}")
+            diagnostics.append(
+                _Diagnostic(
+                    relative_exhibit_path,
+                    (),
+                    0,
+                    f"{relative_exhibit_path}: cannot read metadata: {error}",
+                )
+            )
             continue
 
         if not isinstance(document, dict):
-            errors.append(
-                f"{relative_exhibit_path}: top-level JSON value must be an object"
+            diagnostics.append(
+                _Diagnostic(
+                    relative_exhibit_path,
+                    (),
+                    0,
+                    f"{relative_exhibit_path}: top-level JSON value must be an "
+                    "object",
+                )
             )
             continue
 
@@ -304,7 +365,7 @@ def validate_repository(repository_root: Path) -> list[str]:
         declared_source_ids, source_errors = _declared_source_ids(
             repository_root, source_path
         )
-        errors.extend(source_errors)
+        diagnostics.extend(source_errors)
         relative_source_path = _relative_path(repository_root, source_path)
 
         relationships = document.get("relationships", [])
@@ -325,14 +386,27 @@ def validate_repository(repository_root: Path) -> list[str]:
                     continue
 
                 displayed_source_id = json.dumps(source_id)
-                errors.append(
-                    f"{relative_exhibit_path}: "
-                    f"relationships[{relationship_index}].evidence[{evidence_index}]: "
-                    f"source ID {displayed_source_id} is not declared in "
-                    f"{relative_source_path}"
+                diagnostics.append(
+                    _Diagnostic(
+                        relative_exhibit_path,
+                        (relationship_index, evidence_index),
+                        1,
+                        f"{relative_exhibit_path}: relationships["
+                        f"{relationship_index}].evidence[{evidence_index}]: "
+                        f"source ID {displayed_source_id} is not declared in "
+                        f"{relative_source_path}",
+                    )
                 )
 
-    return sorted(errors)
+    ordered_diagnostics = sorted(
+        diagnostics,
+        key=lambda diagnostic: (
+            diagnostic.path,
+            diagnostic.location,
+            diagnostic.kind,
+        ),
+    )
+    return [diagnostic.message for diagnostic in ordered_diagnostics]
 
 
 def main() -> int:

@@ -695,22 +695,63 @@ class SourceReferenceValidationTests(unittest.TestCase):
             validate_repository(self.repository_root),
         )
 
-    def test_diagnostics_have_stable_path_and_index_order(self):
-        self.write_exhibit("zeta", [["SRC-009"]], "# Sources\n")
+    def test_diagnostics_preserve_numeric_relationship_and_evidence_order(self):
+        evidence_lists = [
+            [f"SRC-{index:03d}" for index in range(11)],
+            *[[f"SRC-{100 + index:03d}"] for index in range(1, 11)],
+        ]
+        self.write_exhibit("serial", evidence_lists, "# Sources\n")
+
+        expected = []
+        for relationship_index, evidence in enumerate(evidence_lists):
+            for evidence_index, source_id in enumerate(evidence):
+                expected.append(
+                    "exhibits/serial/exhibit.json: relationships["
+                    f"{relationship_index}].evidence[{evidence_index}]: "
+                    f'source ID "{source_id}" is not declared in '
+                    "exhibits/serial/sources.md"
+                )
+
+        self.assertEqual(expected, validate_repository(self.repository_root))
+
+    def test_diagnostics_have_stable_path_and_ledger_line_order(self):
+        self.write_exhibit(
+            "zeta",
+            [["SRC-009"]],
+            "### SRC-001 — First manual\n\n"
+            "### SRC-001 — Duplicate manual\n",
+        )
         self.write_exhibit(
             "alpha",
-            [["SRC-002", "SRC-001"]],
-            "# Sources\n",
+            [["SRC-999"]],
+            "### SRC-001 — First manual\n"
+            "Paragraph text\n"
+            "### SRC-002 — `Invalid and misplaced`\n"
+            "\n"
+            "Filler\n"
+            "\n"
+            "Filler\n"
+            "\n"
+            "\n"
+            "### SRC-001 — Duplicate manual\n",
         )
 
         self.assertEqual(
             [
                 "exhibits/alpha/exhibit.json: relationships[0].evidence[0]: "
-                'source ID "SRC-002" is not declared in exhibits/alpha/sources.md',
-                "exhibits/alpha/exhibit.json: relationships[0].evidence[1]: "
-                'source ID "SRC-001" is not declared in exhibits/alpha/sources.md',
+                'source ID "SRC-999" is not declared in exhibits/alpha/sources.md',
+                "exhibits/alpha/sources.md:3: source declaration SRC-002 must be "
+                "top-level at the start of a Markdown block; begin the file or "
+                "precede it with an ASCII space/tab-only blank line",
+                "exhibits/alpha/sources.md:3: source declaration SRC-002 title "
+                "must begin with a literal letter or number; "
+                "Markdown/HTML-prefixed titles are not supported",
+                "exhibits/alpha/sources.md:10: duplicate source ID SRC-001; "
+                "first declared at line 1",
                 "exhibits/zeta/exhibit.json: relationships[0].evidence[0]: "
                 'source ID "SRC-009" is not declared in exhibits/zeta/sources.md',
+                "exhibits/zeta/sources.md:3: duplicate source ID SRC-001; "
+                "first declared at line 1",
             ],
             validate_repository(self.repository_root),
         )
