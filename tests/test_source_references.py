@@ -34,11 +34,16 @@ class SourceReferenceValidationTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-    def test_matching_source_id_is_valid(self):
+    def test_formal_source_id_is_valid_at_bof_or_after_ascii_blank(self):
         self.write_exhibit(
-            "serial",
+            "at-bof",
             [["SRC-001"]],
-            "# Sources\n\n### SRC-001 — Original manual ###\n",
+            "### SRC-001 — Original manual\n",
+        )
+        self.write_exhibit(
+            "after-ascii-blank",
+            [["SRC-001"]],
+            "# Sources\n \t\n### SRC-001 — Original manual ###\n",
         )
 
         self.assertEqual([], validate_repository(self.repository_root))
@@ -88,10 +93,10 @@ class SourceReferenceValidationTests(unittest.TestCase):
             validate_repository(self.repository_root),
         )
 
-    def test_html_blocks_do_not_declare_source_ids(self):
+    def test_html_blocks_ignore_or_reject_source_like_headings(self):
         sources_by_exhibit = {
-            "comment": ("SRC-401", "<!--\n### SRC-401 — Disabled\n-->\n"),
-            "pre": ("SRC-402", "<pre>\n### SRC-402 — Literal\n</pre>\n"),
+            "comment": ("SRC-401", "<!--\n\n### SRC-401 — Disabled\n-->\n"),
+            "pre": ("SRC-402", "<pre>\n\n### SRC-402 — Literal\n</pre>\n"),
             "div": ("SRC-403", "<div>\n### SRC-403 — Literal\n</div>\n"),
             "hgroup": (
                 "SRC-404",
@@ -108,9 +113,15 @@ class SourceReferenceValidationTests(unittest.TestCase):
                 "exhibits/comment/sources.md",
                 "exhibits/div/exhibit.json: relationships[0].evidence[0]: "
                 'source ID "SRC-403" is not declared in exhibits/div/sources.md',
+                "exhibits/div/sources.md:2: source declaration SRC-403 must be "
+                "top-level at the start of a Markdown block; begin the file or "
+                "precede it with an ASCII space/tab-only blank line",
                 "exhibits/hgroup/exhibit.json: relationships[0].evidence[0]: "
                 'source ID "SRC-404" is not declared in '
                 "exhibits/hgroup/sources.md",
+                "exhibits/hgroup/sources.md:2: source declaration SRC-404 must be "
+                "top-level at the start of a Markdown block; begin the file or "
+                "precede it with an ASCII space/tab-only blank line",
                 "exhibits/pre/exhibit.json: relationships[0].evidence[0]: "
                 'source ID "SRC-402" is not declared in exhibits/pre/sources.md',
             ],
@@ -130,7 +141,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
 
         self.assertEqual([], validate_repository(self.repository_root))
 
-    def test_generic_html_quoted_angles_hide_source_headings(self):
+    def test_generic_html_with_quoted_angles_fails_closed(self):
         self.write_exhibit(
             "greater",
             [["SRC-404"]],
@@ -147,13 +158,44 @@ class SourceReferenceValidationTests(unittest.TestCase):
                 "exhibits/greater/exhibit.json: relationships[0].evidence[0]: "
                 'source ID "SRC-404" is not declared in '
                 "exhibits/greater/sources.md",
+                "exhibits/greater/sources.md:2: source declaration SRC-404 must be "
+                "top-level at the start of a Markdown block; begin the file or "
+                "precede it with an ASCII space/tab-only blank line",
                 "exhibits/less/exhibit.json: relationships[0].evidence[0]: "
                 'source ID "SRC-405" is not declared in exhibits/less/sources.md',
+                "exhibits/less/sources.md:2: source declaration SRC-405 must be "
+                "top-level at the start of a Markdown block; begin the file or "
+                "precede it with an ASCII space/tab-only blank line",
             ],
             validate_repository(self.repository_root),
         )
 
-    def test_generic_html_does_not_interrupt_paragraph(self):
+    def test_multiline_html_constructs_suppress_candidates_across_blank_lines(self):
+        cases = [
+            ("cdata", "SRC-440", "<![CDATA[\n\n", "]]>\n"),
+            ("comment", "SRC-441", "<!--\n\n", "-->\n"),
+            ("declaration", "SRC-442", "<!DOCTYPE\n\n", ">\n"),
+            ("processing-instruction", "SRC-443", "<?target\n\n", "?>\n"),
+            ("raw-html", "SRC-444", "<pre>\n\n", "</pre>\n"),
+        ]
+        for name, source_id, prefix, suffix in cases:
+            self.write_exhibit(
+                name,
+                [[source_id]],
+                f"{prefix}### {source_id} — Literal content\n{suffix}",
+            )
+
+        self.assertEqual(
+            [
+                f"exhibits/{name}/exhibit.json: relationships[0].evidence[0]: "
+                f'source ID "{source_id}" is not declared in '
+                f"exhibits/{name}/sources.md"
+                for name, source_id, _, _ in cases
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_source_like_heading_after_paragraph_fails_closed(self):
         self.write_exhibit(
             "serial",
             [],
@@ -165,8 +207,9 @@ class SourceReferenceValidationTests(unittest.TestCase):
 
         self.assertEqual(
             [
-                "exhibits/serial/sources.md:4: duplicate source ID SRC-001; "
-                "first declared at line 1"
+                "exhibits/serial/sources.md:4: source declaration SRC-001 must be "
+                "top-level at the start of a Markdown block; begin the file or "
+                "precede it with an ASCII space/tab-only blank line"
             ],
             validate_repository(self.repository_root),
         )
@@ -182,7 +225,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
             self.write_exhibit(
                 name,
                 [[source_id]],
-                f"{invalid_tag}\n### {source_id} — Real manual\n",
+                f"{invalid_tag}\n\n### {source_id} — Real manual\n",
             )
 
         self.assertEqual([], validate_repository(self.repository_root))
@@ -193,12 +236,13 @@ class SourceReferenceValidationTests(unittest.TestCase):
             [["SRC-419"]],
             "<pre>\n"
             "</script>\n"
+            "\n"
             "### SRC-419 — Real manual\n",
         )
 
         self.assertEqual([], validate_repository(self.repository_root))
 
-    def test_unicode_whitespace_does_not_end_fence_or_html_block(self):
+    def test_unicode_whitespace_does_not_create_a_formal_boundary(self):
         self.write_exhibit(
             "fence",
             [["SRC-407"]],
@@ -222,6 +266,9 @@ class SourceReferenceValidationTests(unittest.TestCase):
                 'source ID "SRC-407" is not declared in exhibits/fence/sources.md',
                 "exhibits/html/exhibit.json: relationships[0].evidence[0]: "
                 'source ID "SRC-408" is not declared in exhibits/html/sources.md',
+                "exhibits/html/sources.md:3: source declaration SRC-408 must be "
+                "top-level at the start of a Markdown block; begin the file or "
+                "precede it with an ASCII space/tab-only blank line",
             ],
             validate_repository(self.repository_root),
         )
@@ -232,6 +279,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
             [["SRC-420"]],
             "```markdown\n"
             "``` \t\n"
+            "\n"
             "### SRC-420 — Real manual\n",
         )
         self.write_exhibit(
@@ -264,6 +312,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
             "serial",
             [["SRC-001"]],
             "```foo`bar\n"
+            "\n"
             "### SRC-001 — Real manual\n"
             "```\n",
         )
@@ -320,6 +369,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
             "# Sources\n\n"
             "SRC-404 is mentioned in prose only.\n\n"
             "```markdown\n"
+            "\n"
             "### SRC-404 — Example heading\n"
             "```\n",
         )
@@ -468,7 +518,41 @@ class SourceReferenceValidationTests(unittest.TestCase):
             validate_repository(self.repository_root),
         )
 
-    def test_checked_in_corpus_is_valid(self):
+    def test_ambiguous_markdown_predecessors_fail_closed(self):
+        cases = [
+            ("blockquote", "SRC-430", "> quoted text\n"),
+            ("indented-code", "SRC-431", "    literal code\n"),
+            ("list", "SRC-432", "- list item\n"),
+            ("setext", "SRC-433", "Section title\n---\n"),
+            ("thematic", "SRC-434", "***\n"),
+            ("type-7", "SRC-435", "<kbd>\n"),
+        ]
+        for name, source_id, predecessor in cases:
+            self.write_exhibit(
+                name,
+                [[source_id]],
+                f"{predecessor}### {source_id} — Ambiguous placement\n",
+            )
+
+        expected = []
+        for name, source_id, predecessor in cases:
+            line_number = predecessor.count("\n") + 1
+            expected.extend(
+                [
+                    f"exhibits/{name}/exhibit.json: "
+                    "relationships[0].evidence[0]: "
+                    f'source ID "{source_id}" is not declared in '
+                    f"exhibits/{name}/sources.md",
+                    f"exhibits/{name}/sources.md:{line_number}: source declaration "
+                    f"{source_id} must be top-level at the start of a Markdown "
+                    "block; begin the file or precede it with an ASCII "
+                    "space/tab-only blank line",
+                ]
+            )
+
+        self.assertEqual(expected, validate_repository(self.repository_root))
+
+    def test_checked_in_template_and_corpus_are_valid(self):
         self.assertEqual([], validate_repository(REPOSITORY_ROOT))
 
     def test_non_object_metadata_has_stable_diagnostic(self):

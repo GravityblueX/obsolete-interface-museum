@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Validate relationship evidence against each exhibit's source ledger."""
+"""Validate relationship evidence against each exhibit's formal source ledger.
+
+A declaration starts at column one and must be the first line of the file or
+follow an ASCII space/tab-only blank line.  This deliberately conservative
+contract makes ambiguous Markdown placement fail closed without attempting to
+implement a complete Markdown block parser.
+"""
 
 from __future__ import annotations
 
@@ -20,10 +26,6 @@ TAG_NAME = r"[A-Za-z][A-Za-z0-9-]*"
 ATTRIBUTE_NAME = r"[A-Za-z_:][A-Za-z0-9_.:-]*"
 ATTRIBUTE_VALUE = r'''(?:[^ "'=<>`]+|'[^']*'|"[^"]*")'''
 ATTRIBUTE = rf"(?:[ \t]+{ATTRIBUTE_NAME}(?:[ \t]*=[ \t]*{ATTRIBUTE_VALUE})?)"
-HTML_OPEN_TAG = re.compile(
-    rf"^ {{0,3}}<{TAG_NAME}(?:{ATTRIBUTE})*[ \t]*/?>[ \t]*$"
-)
-HTML_CLOSING_TAG = re.compile(rf"^ {{0,3}}</{TAG_NAME}[ \t]*>[ \t]*$")
 INLINE_HTML_TAG = re.compile(
     rf"</?{TAG_NAME}(?:{ATTRIBUTE})*[ \t]*/?>"
 )
@@ -33,7 +35,6 @@ INLINE_LINK = re.compile(
 REFERENCE_LINK = re.compile(r"!?\[([^\]\n]*)\]\[[^\]\n]*\]")
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 ASCII_BLANK = re.compile(r"^[ \t]*$")
-ATX_HEADING = re.compile(r"^ {0,3}#{1,6}(?:[ \t]+|$)")
 HTML_COMMENT_START = re.compile(r"^ {0,3}<!--")
 HTML_PROCESSING_INSTRUCTION_START = re.compile(r"^ {0,3}<\?")
 HTML_DECLARATION_START = re.compile(r"^ {0,3}<![A-Z]")
@@ -43,15 +44,6 @@ RAW_HTML_START = re.compile(
 )
 RAW_HTML_END = re.compile(
     r"</(?:pre|script|style|textarea)[ \t]*>", re.IGNORECASE
-)
-HTML_BLOCK_START = re.compile(
-    r"^ {0,3}</?(?:address|article|aside|base|basefont|blockquote|body|caption|"
-    r"center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|"
-    r"figure|footer|form|frame|frameset|h[1-6]|head|header|hgroup|hr|html|"
-    r"iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|"
-    r"param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|"
-    r"track|ul)(?:[ \t]|/?>|$)",
-    re.IGNORECASE,
 )
 
 
@@ -86,16 +78,18 @@ def _source_declaration(line: str) -> str | None:
     return source_id
 
 
-def _source_declarations(source_text: str) -> list[tuple[str, int]]:
+def _source_declarations(
+    source_text: str,
+) -> tuple[list[tuple[str, int]], list[tuple[str, int]]]:
     declarations: list[tuple[str, int]] = []
+    misplaced_declarations: list[tuple[str, int]] = []
     fence_character: str | None = None
     fence_length = 0
     html_end: re.Pattern[str] | None = None
-    html_until_blank = False
-    paragraph_open = False
 
     normalized_source_text = source_text.replace("\r\n", "\n").replace("\r", "\n")
-    for line_number, line in enumerate(normalized_source_text.split("\n"), start=1):
+    source_lines = normalized_source_text.split("\n")
+    for line_number, line in enumerate(source_lines, start=1):
         fence_match = _fence_match(line)
         if fence_character is not None:
             if fence_match:
@@ -114,77 +108,49 @@ def _source_declarations(source_text: str) -> list[tuple[str, int]]:
                 html_end = None
             continue
 
-        if html_until_blank:
-            if ASCII_BLANK.fullmatch(line):
-                html_until_blank = False
-            continue
-
-        if ASCII_BLANK.fullmatch(line):
-            paragraph_open = False
-            continue
-
         if fence_match:
             marker, _ = fence_match.groups()
             fence_character = marker[0]
             fence_length = len(marker)
-            paragraph_open = False
             continue
 
         if HTML_COMMENT_START.match(line):
             if "-->" not in line:
                 html_end = re.compile(r"-->")
-            paragraph_open = False
             continue
 
         if HTML_PROCESSING_INSTRUCTION_START.match(line):
             if "?>" not in line:
                 html_end = re.compile(r"\?>")
-            paragraph_open = False
             continue
 
         if HTML_CDATA_START.match(line):
             if "]]>" not in line:
                 html_end = re.compile(r"\]\]>")
-            paragraph_open = False
             continue
 
         if HTML_DECLARATION_START.match(line):
             if ">" not in line:
                 html_end = re.compile(r">")
-            paragraph_open = False
             continue
 
         raw_html_match = RAW_HTML_START.match(line)
         if raw_html_match:
             if not RAW_HTML_END.search(line):
                 html_end = RAW_HTML_END
-            paragraph_open = False
-            continue
-
-        if HTML_BLOCK_START.match(line):
-            html_until_blank = True
-            paragraph_open = False
-            continue
-
-        if not paragraph_open and (
-            HTML_OPEN_TAG.match(line) or HTML_CLOSING_TAG.match(line)
-        ):
-            html_until_blank = True
             continue
 
         source_id = _source_declaration(line)
         if source_id is not None:
-            declarations.append((source_id, line_number))
-            paragraph_open = False
-            continue
+            previous_line_is_blank = line_number == 1 or bool(
+                ASCII_BLANK.fullmatch(source_lines[line_number - 2])
+            )
+            destination = (
+                declarations if previous_line_is_blank else misplaced_declarations
+            )
+            destination.append((source_id, line_number))
 
-        if ATX_HEADING.match(line):
-            paragraph_open = False
-            continue
-
-        paragraph_open = True
-
-    return declarations
+    return declarations, misplaced_declarations
 
 
 def _declared_source_ids(
@@ -204,7 +170,15 @@ def _declared_source_ids(
 
     first_declaration_lines: dict[str, int] = {}
     errors: list[str] = []
-    for source_id, line_number in _source_declarations(source_text):
+    declarations, misplaced_declarations = _source_declarations(source_text)
+    for source_id, line_number in misplaced_declarations:
+        errors.append(
+            f"{relative_source_path}:{line_number}: source declaration {source_id} "
+            "must be top-level at the start of a Markdown block; begin the file or "
+            "precede it with an ASCII space/tab-only blank line"
+        )
+
+    for source_id, line_number in declarations:
         first_line = first_declaration_lines.get(source_id)
         if first_line is None:
             first_declaration_lines[source_id] = line_number
