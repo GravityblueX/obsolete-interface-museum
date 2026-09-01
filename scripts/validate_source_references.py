@@ -26,7 +26,7 @@ HTML_PROCESSING_INSTRUCTION_START = re.compile(r"^ {0,3}<\?")
 HTML_DECLARATION_START = re.compile(r"^ {0,3}<![A-Z]")
 HTML_CDATA_START = re.compile(r"^ {0,3}<!\[CDATA\[")
 RAW_HTML_START = re.compile(
-    r"^ {0,3}<(pre|script|style|textarea)(?:[ \t\f>]|$)",
+    r"^ {0,3}<(pre|script|style|textarea)(?:[ \t\v\f>]|$)",
     re.IGNORECASE | re.ASCII,
 )
 RAW_HTML_END = re.compile(

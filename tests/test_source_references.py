@@ -310,17 +310,25 @@ class SourceReferenceValidationTests(unittest.TestCase):
             validate_repository(self.repository_root),
         )
 
-    def test_form_feed_is_raw_html_tag_whitespace(self):
-        self.write_exhibit(
-            "serial",
-            [["SRC-492"]],
-            "<pre\f>\n\n### SRC-492 — Still raw HTML\n",
-        )
+    def test_ascii_control_whitespace_starts_raw_html_block(self):
+        cases = {
+            "form-feed": ("SRC-492", "\f"),
+            "vertical-tab": ("SRC-502", "\v"),
+        }
+        for name in sorted(cases):
+            source_id, whitespace = cases[name]
+            self.write_exhibit(
+                name,
+                [[source_id]],
+                f"<pre{whitespace}>\n\n### {source_id} — Still raw HTML\n",
+            )
 
         self.assertEqual(
             [
-                "exhibits/serial/exhibit.json: relationships[0].evidence[0]: "
-                'source ID "SRC-492" is not declared in exhibits/serial/sources.md'
+                f"exhibits/{name}/exhibit.json: relationships[0].evidence[0]: "
+                f'source ID "{source_id}" is not declared in '
+                f"exhibits/{name}/sources.md"
+                for name, (source_id, _) in sorted(cases.items())
             ],
             validate_repository(self.repository_root),
         )
