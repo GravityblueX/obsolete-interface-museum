@@ -56,25 +56,43 @@ def _source_declaration(line: str) -> tuple[str, bool] | None:
     return source_id, bool(title) and title[0].isalnum()
 
 
+def _is_formal_block_boundary(source_lines: list[str], line_number: int) -> bool:
+    return line_number == 1 or bool(
+        ASCII_BLANK.fullmatch(source_lines[line_number - 2])
+    )
+
+
 def _source_declarations(
     source_text: str,
 ) -> tuple[
     list[tuple[str, int]],
     list[tuple[str, int]],
     list[tuple[str, int]],
+    list[tuple[str, int, int]],
 ]:
     declarations: list[tuple[str, int]] = []
     misplaced_declarations: list[tuple[str, int]] = []
     invalid_title_declarations: list[tuple[str, int]] = []
+    ambiguous_block_declarations: list[tuple[str, int, int]] = []
     fence_character: str | None = None
     fence_length = 0
+    fence_opener_line = 0
+    fence_is_ambiguous = False
     html_end: re.Pattern[str] | None = None
+    html_opener_line = 0
+    html_is_ambiguous = False
 
     normalized_source_text = source_text.replace("\r\n", "\n").replace("\r", "\n")
     source_lines = normalized_source_text.split("\n")
     for line_number, line in enumerate(source_lines, start=1):
         fence_match = _fence_match(line)
         if fence_character is not None:
+            source_declaration = _source_declaration(line)
+            if fence_is_ambiguous and source_declaration is not None:
+                source_id, _ = source_declaration
+                ambiguous_block_declarations.append(
+                    (source_id, line_number, fence_opener_line)
+                )
             if fence_match:
                 marker, remainder = fence_match.groups()
                 if (
@@ -84,50 +102,84 @@ def _source_declarations(
                 ):
                     fence_character = None
                     fence_length = 0
+                    fence_opener_line = 0
+                    fence_is_ambiguous = False
             continue
 
         if html_end is not None:
+            source_declaration = _source_declaration(line)
+            if html_is_ambiguous and source_declaration is not None:
+                source_id, _ = source_declaration
+                ambiguous_block_declarations.append(
+                    (source_id, line_number, html_opener_line)
+                )
             if html_end.search(line):
                 html_end = None
+                html_opener_line = 0
+                html_is_ambiguous = False
             continue
 
         if fence_match:
             marker, _ = fence_match.groups()
             fence_character = marker[0]
             fence_length = len(marker)
+            fence_opener_line = line_number
+            fence_is_ambiguous = not _is_formal_block_boundary(
+                source_lines, line_number
+            )
             continue
 
         if HTML_COMMENT_START.match(line):
             if "-->" not in line:
                 html_end = re.compile(r"-->")
+                html_opener_line = line_number
+                html_is_ambiguous = not _is_formal_block_boundary(
+                    source_lines, line_number
+                )
             continue
 
         if HTML_PROCESSING_INSTRUCTION_START.match(line):
             if "?>" not in line:
                 html_end = re.compile(r"\?>")
+                html_opener_line = line_number
+                html_is_ambiguous = not _is_formal_block_boundary(
+                    source_lines, line_number
+                )
             continue
 
         if HTML_CDATA_START.match(line):
             if "]]>" not in line:
                 html_end = re.compile(r"\]\]>")
+                html_opener_line = line_number
+                html_is_ambiguous = not _is_formal_block_boundary(
+                    source_lines, line_number
+                )
             continue
 
         if HTML_DECLARATION_START.match(line):
             if ">" not in line:
                 html_end = re.compile(r">")
+                html_opener_line = line_number
+                html_is_ambiguous = not _is_formal_block_boundary(
+                    source_lines, line_number
+                )
             continue
 
         raw_html_match = RAW_HTML_START.match(line)
         if raw_html_match:
             if not RAW_HTML_END.search(line):
                 html_end = RAW_HTML_END
+                html_opener_line = line_number
+                html_is_ambiguous = not _is_formal_block_boundary(
+                    source_lines, line_number
+                )
             continue
 
         source_declaration = _source_declaration(line)
         if source_declaration is not None:
             source_id, title_is_valid = source_declaration
-            previous_line_is_blank = line_number == 1 or bool(
-                ASCII_BLANK.fullmatch(source_lines[line_number - 2])
+            previous_line_is_blank = _is_formal_block_boundary(
+                source_lines, line_number
             )
             if not previous_line_is_blank:
                 misplaced_declarations.append((source_id, line_number))
@@ -136,7 +188,12 @@ def _source_declarations(
             if previous_line_is_blank and title_is_valid:
                 declarations.append((source_id, line_number))
 
-    return declarations, misplaced_declarations, invalid_title_declarations
+    return (
+        declarations,
+        misplaced_declarations,
+        invalid_title_declarations,
+        ambiguous_block_declarations,
+    )
 
 
 def _declared_source_ids(
@@ -156,9 +213,12 @@ def _declared_source_ids(
 
     first_declaration_lines: dict[str, int] = {}
     errors: list[str] = []
-    declarations, misplaced_declarations, invalid_title_declarations = (
-        _source_declarations(source_text)
-    )
+    (
+        declarations,
+        misplaced_declarations,
+        invalid_title_declarations,
+        ambiguous_block_declarations,
+    ) = _source_declarations(source_text)
     for source_id, line_number in misplaced_declarations:
         errors.append(
             f"{relative_source_path}:{line_number}: source declaration {source_id} "
@@ -171,6 +231,13 @@ def _declared_source_ids(
             f"{relative_source_path}:{line_number}: source declaration {source_id} "
             "title must begin with a literal letter or number; Markdown/HTML-"
             "prefixed titles are not supported"
+        )
+
+    for source_id, line_number, opener_line in ambiguous_block_declarations:
+        errors.append(
+            f"{relative_source_path}:{line_number}: source-like heading {source_id} "
+            f"is inside an ambiguous Markdown block opened at line {opener_line}; "
+            "precede the block opener with an ASCII space/tab-only blank line"
         )
 
     for source_id, line_number in declarations:

@@ -602,6 +602,57 @@ class SourceReferenceValidationTests(unittest.TestCase):
 
         self.assertEqual(expected, validate_repository(self.repository_root))
 
+    def test_nested_cross_blank_openers_fail_closed(self):
+        cases = {
+            "cdata": ("SRC-460", "<kbd>\n<![CDATA[\n"),
+            "comment": ("SRC-461", "<kbd>\n<!--\n"),
+            "declaration": ("SRC-462", "<kbd>\n<!DOCTYPE\n"),
+            "fence": ("SRC-463", "<kbd>\n```markdown\n"),
+            "processing-instruction": ("SRC-464", "<kbd>\n<?target\n"),
+            "raw-html": ("SRC-465", "<div>\n<pre>\n"),
+        }
+        for name in sorted(cases):
+            source_id, ambiguous_prefix = cases[name]
+            self.write_exhibit(
+                name,
+                [],
+                f"### {source_id} — First manual\n\n"
+                f"{ambiguous_prefix}\n"
+                f"### {source_id} — Second manual\n",
+            )
+
+        self.assertEqual(
+            [
+                f"exhibits/{name}/sources.md:6: source-like heading {source_id} "
+                "is inside an ambiguous Markdown block opened at line 4; "
+                "precede the block opener with an ASCII space/tab-only blank line"
+                for name, (source_id, _) in sorted(cases.items())
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_closed_ambiguous_blocks_do_not_hide_later_declarations(self):
+        self.write_exhibit(
+            "fence",
+            [["SRC-470"]],
+            "Paragraph text\n"
+            "```markdown\n"
+            "literal content\n"
+            "```\n\n"
+            "### SRC-470 — Real manual\n",
+        )
+        self.write_exhibit(
+            "raw-html",
+            [["SRC-471"]],
+            "Paragraph text\n"
+            "<pre>\n"
+            "literal content\n"
+            "</pre>\n\n"
+            "### SRC-471 — Real manual\n",
+        )
+
+        self.assertEqual([], validate_repository(self.repository_root))
+
     def test_checked_in_template_and_corpus_are_valid(self):
         self.assertEqual([], validate_repository(REPOSITORY_ROOT))
 
