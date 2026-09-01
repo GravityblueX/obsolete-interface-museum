@@ -115,7 +115,20 @@
     "relationship": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "target", "layer", "scope"],
+      "required": ["type", "target", "layer", "scope", "requires", "evidence"],
+      "allOf": [
+        {
+          "if": {
+            "required": ["type"],
+            "properties": {
+              "type": { "const": "compatible-with" }
+            }
+          },
+          "then": {
+            "required": ["direction"]
+          }
+        }
+      ],
       "properties": {
         "type": {
           "enum": [
@@ -133,7 +146,7 @@
         "scope": { "type": "string", "minLength": 1 },
         "requires": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": { "type": "string", "minLength": 1 },
           "uniqueItems": true
         },
         "direction": {
@@ -141,7 +154,8 @@
         },
         "evidence": {
           "type": "array",
-          "items": { "type": "string" },
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
           "uniqueItems": true
         },
         "notes": { "type": ["string", "null"] }

@@ -46,3 +46,14 @@ ISA 展品需要能表达：
 3. 跨 connector、host interface 与 command model 的存储接口家族。
 
 因此后续新增展品时，优先复用此契约。若某展品无法自然落入六层结构，应先判断它是不是更适合作为 `study`、`lab` 或多个相互关联的 exhibit，而不是继续扩大一个模糊展品的边界。
+
+## Machine validation
+
+从仓库根目录安装开发依赖并运行 Draft 2020-12 schema 回归：
+
+```text
+python -m pip install -r requirements-dev.txt
+python -B -m unittest discover -s tests -v
+```
+
+回归会检查 schema 本身、展品模板和所有已检入的 `exhibit.json`，并验证关系记录的中介条件、方向和证据门禁。
