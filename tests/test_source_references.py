@@ -310,6 +310,65 @@ class SourceReferenceValidationTests(unittest.TestCase):
             validate_repository(self.repository_root),
         )
 
+    def test_form_feed_is_raw_html_tag_whitespace(self):
+        self.write_exhibit(
+            "serial",
+            [["SRC-492"]],
+            "<pre\f>\n\n### SRC-492 — Still raw HTML\n",
+        )
+
+        self.assertEqual(
+            [
+                "exhibits/serial/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-492" is not declared in exhibits/serial/sources.md'
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_one_leading_bom_is_removed_before_block_scanning(self):
+        self.write_exhibit(
+            "formal-heading",
+            [["SRC-493"]],
+            "\ufeff### SRC-493 — Real manual\n",
+        )
+        self.write_exhibit(
+            "duplicate",
+            [],
+            "\ufeff### SRC-494 — First manual\n\n"
+            "### SRC-494 — Second manual\n",
+        )
+        self.write_exhibit(
+            "fence",
+            [["SRC-495"]],
+            "\ufeff```markdown\n\n### SRC-495 — Literal heading\n```\n",
+        )
+        self.write_exhibit(
+            "raw-html",
+            [["SRC-496"]],
+            "\ufeff<pre>\n\n### SRC-496 — Literal heading\n",
+        )
+        self.write_exhibit(
+            "embedded-bom",
+            [["SRC-497"]],
+            "# Sources\n\n\ufeff### SRC-497 — Not at column one\n",
+        )
+
+        self.assertEqual(
+            [
+                "exhibits/duplicate/sources.md:3: duplicate source ID SRC-494; "
+                "first declared at line 1",
+                "exhibits/embedded-bom/exhibit.json: "
+                "relationships[0].evidence[0]: source ID \"SRC-497\" is not "
+                "declared in exhibits/embedded-bom/sources.md",
+                "exhibits/fence/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-495" is not declared in exhibits/fence/sources.md',
+                "exhibits/raw-html/exhibit.json: relationships[0].evidence[0]: "
+                'source ID "SRC-496" is not declared in '
+                "exhibits/raw-html/sources.md",
+            ],
+            validate_repository(self.repository_root),
+        )
+
     def test_unicode_lookalike_does_not_end_raw_html_block(self):
         self.write_exhibit(
             "serial",

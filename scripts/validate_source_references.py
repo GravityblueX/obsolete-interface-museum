@@ -26,7 +26,7 @@ HTML_PROCESSING_INSTRUCTION_START = re.compile(r"^ {0,3}<\?")
 HTML_DECLARATION_START = re.compile(r"^ {0,3}<![A-Z]")
 HTML_CDATA_START = re.compile(r"^ {0,3}<!\[CDATA\[")
 RAW_HTML_START = re.compile(
-    r"^ {0,3}<(pre|script|style|textarea)(?:[ \t>]|$)",
+    r"^ {0,3}<(pre|script|style|textarea)(?:[ \t\f>]|$)",
     re.IGNORECASE | re.ASCII,
 )
 RAW_HTML_END = re.compile(
@@ -93,7 +93,10 @@ def _source_declarations(
     html_opener_line = 0
     html_is_ambiguous = False
 
-    normalized_source_text = source_text.replace("\r\n", "\n").replace("\r", "\n")
+    normalized_source_text = source_text.removeprefix("\ufeff")
+    normalized_source_text = normalized_source_text.replace("\r\n", "\n").replace(
+        "\r", "\n"
+    )
     source_lines = normalized_source_text.split("\n")
     for line_number, line in enumerate(source_lines, start=1):
         fence_match = _fence_match(line)
