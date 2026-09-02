@@ -5,7 +5,6 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = REPOSITORY_ROOT / "schemas" / "exhibit.schema.json"
 TEMPLATE_PATH = REPOSITORY_ROOT / "exhibits" / "_template" / "exhibit.json"
@@ -117,9 +116,7 @@ class ExhibitSchemaRegressionTests(unittest.TestCase):
         relationship = self.relationship("compatible-with")
         relationship["direction"] = "not-applicable"
         errors = list(
-            self.validator.iter_errors(
-                self.document_with_relationship(relationship)
-            )
+            self.validator.iter_errors(self.document_with_relationship(relationship))
         )
         matching_errors = [
             error
@@ -136,9 +133,7 @@ class ExhibitSchemaRegressionTests(unittest.TestCase):
         relationship = self.relationship("compatible-with")
         relationship["evidence"] = []
         errors = list(
-            self.validator.iter_errors(
-                self.document_with_relationship(relationship)
-            )
+            self.validator.iter_errors(self.document_with_relationship(relationship))
         )
         matching_errors = [
             error
@@ -161,9 +156,7 @@ class ExhibitSchemaRegressionTests(unittest.TestCase):
             expected_path = ["relationships", 0, field]
 
         errors = list(
-            self.validator.iter_errors(
-                self.document_with_relationship(relationship)
-            )
+            self.validator.iter_errors(self.document_with_relationship(relationship))
         )
         matching_errors = [
             error
