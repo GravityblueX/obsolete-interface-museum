@@ -115,7 +115,25 @@
     "relationship": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "target", "layer", "scope"],
+      "required": ["type", "target", "layer", "scope", "requires", "evidence"],
+      "allOf": [
+        {
+          "if": {
+            "required": ["type"],
+            "properties": {
+              "type": { "const": "compatible-with" }
+            }
+          },
+          "then": {
+            "required": ["direction"],
+            "properties": {
+              "direction": {
+                "enum": ["one-way", "bidirectional", "unknown"]
+              }
+            }
+          }
+        }
+      ],
       "properties": {
         "type": {
           "enum": [
@@ -126,14 +144,14 @@
             "electrically-related"
           ]
         },
-        "target": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "layer": {
           "enum": ["physical", "electrical", "signaling", "protocol", "host", "ecosystem", "multiple"]
         },
-        "scope": { "type": "string", "minLength": 1 },
+        "scope": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "requires": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" },
           "uniqueItems": true
         },
         "direction": {
@@ -141,7 +159,8 @@
         },
         "evidence": {
           "type": "array",
-          "items": { "type": "string" },
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" },
           "uniqueItems": true
         },
         "notes": { "type": ["string", "null"] }
