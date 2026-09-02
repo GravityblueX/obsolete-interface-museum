@@ -41,15 +41,15 @@ connector, cable and DTE/DCE mapping
 
 | ID | 来源与定位 | 等级 | 可支持 | 不能单独支持 |
 |---|---|---:|---|---|
-| S1 | TIA-232-F-1997, *Interface Between Data Terminal Equipment and Data Circuit-Terminating Equipment Employing Serial Binary Data Interchange*；[封面/目录预览（含 2012 reaffirmation）](<https://www.normsplash.com/Samples/TIA/127475168/TIA-232-F-1997-(R2012)-en.pdf>)。封面使用 `TIA-232-F-1997`，其中复现的 1997 contents page 标为 `ANSI/TIA/EIA-232-F` | E1（仅审阅预览，未取得全文） | 标准身份、正式标题、修订/重申日期与目录范围 | 本轮未读到正文，不能据此声称具体针脚、电压或时序条文 |
+| S1 | TIA-232-F-1997, *Interface Between Data Terminal Equipment and Data Circuit-Terminating Equipment Employing Serial Binary Data Interchange*；[第三方托管的封面/目录预览（含 2012 reaffirmation）](<https://www.normsplash.com/Samples/TIA/127475168/TIA-232-F-1997-(R2012)-en.pdf>)。封面使用 `TIA-232-F-1997`，其中复现的 1997 contents page 标为 `ANSI/TIA/EIA-232-F`；该链接不是 TIA 官方 catalog 或销售入口 | E1（标准文献片段；第三方托管，未取得全文） | 预览中可见的标准身份、正式标题、修订/重申日期与目录范围 | 本轮未读到正文，不能据此声称具体针脚、电压或时序条文，也不能用第三方 host 证明标准的当前状态 |
 | S2 | ITU-T Recommendation V.24 (02/2000), *List of definitions for interchange circuits between DTE and DCE*；[公开全文入口](https://www.itu.int/rec/T-REC-V.24-200002-I/en)，§§1–4，尤其 pp. 1–6、13–17 | E1 | DTE/DCE 边界；103/104、105/106、107、108/2、109、125 等 circuits 的功能、方向和相互关系 | 不应当被写成完整 TIA-232-F 的逐条替代品；§1.2、§1.3 明确把 electrical 与 mechanical 特性委托给别的规范 |
 | S3 | ITU-T Recommendation V.28 (03/1993), *Electrical characteristics for unbalanced double-current interchange circuits*；[公开全文入口](https://www.itu.int/rec/T-REC-V.28-199303-I/en)，§§1–7，pp. 1–5 | E1 | interchange point 的等效电路、负载/发生器边界、±3 V 判定区、数据与控制 circuit 的极性语义、转换区与失效检测 | 连接器针脚；PC UART 寄存器；任意具体适配器一定达到的实测值 |
 | S4 | ISO 2110:1989 (3rd ed.), *Information technology — Data communication — 25-pole DTE/DCE interface connector and contact number assignments*；[IEC catalog record](https://webstore.iec.ch/en/publication/61738) 与 [Amd 1:1991 record](https://webstore.iec.ch/en/publication/61739)。V.28 Figure 2 note 2 只写无版次的 `ISO 2110`；V.24 §1.3 则把 mechanical characteristics 分派给 ISO/IEC connector standards | E1（仅元数据/交叉引用；未取得全文） | 标准身份、1989/1991 版本边界与 25-contact mechanical mapping 的规范入口 | 实际 contact assignment；1989/1991 文本是否可不变地套用到 IBM 1984 或更早设备 |
-| S5 | IBM, *IBM Personal Computer Technical Reference*, April 1984, part no. 6322507；[Internet Archive 扫描](https://archive.org/details/IBMPCIBM5150TechnicalReference6322507APR84)，pp. 3-3、5-8、5-50–5-54、8-2–8-5 | E1 | IBM PC 电源为何给 EIA driver/receiver 提供 ±12 V；BIOS 数据区与 8250；INT 14h 串口服务；当时 IBM 对 DTE/DCE、25-contact RS-232C 与 modem control 的解释 | 后来的 PC DE-9 mapping；所有兼容机；现代 USB 转换器行为 |
+| S5 | IBM, *IBM Personal Computer Technical Reference*, Revised Edition, April 1984, publication no. 6361453；[Internet Archive 扫描](https://archive.org/details/IBMPCIBM5150TechnicalReference6322507APR84)（archive identifier/URL slug 与 PDF 文件名误标为 `6322507`；archive 页面当前显示标题、扫描内封面与末尾 Reader's Comment Form 均为 `6361453`），pp. 3-3、5-8、5-50–5-54、8-2–8-5 | E1 | IBM PC 电源为何给 EIA driver/receiver 提供 ±12 V；BIOS 数据区与 8250；INT 14h 串口服务；当时 IBM 对 DTE/DCE、25-contact RS-232C 与 modem control 的解释 | 后来的 PC DE-9 mapping；所有兼容机；现代 USB 转换器行为 |
 | S6 | Texas Instruments, *MC1488, SN55188, SN75188 Quadruple Line Drivers*, SLLS094C；[datasheet](https://www.ti.com/lit/ds/symlink/sn75188.pdf)，pp. 1–4 | E1（器件） | 一类经典 line driver 的逻辑输入、双电源与线路输出；器件声明满足 TIA/EIA-232-E 与 V.28 | 整个接口标准；某块 IBM 卡一定使用哪个具体厂牌/修订器件 |
 | S7 | Texas Instruments, *MC1489(A), SN55189(A), SN75189(A) Quadruple Line Receivers*, SLLS095D；[datasheet](https://www.ti.com/lit/ds/symlink/sn75189a.pdf)，pp. 1–4 | E1（器件） | 一类经典 line receiver 的 3–7 kΩ 输入、线路侧输入范围与 5 V logic 输出 | 标准规定与单一器件能力之间不能画等号 |
 | S8 | Texas Instruments, *Interface Circuits for TIA/EIA-232-F*, SLLA037A, September 2002；[application report](https://www.ti.com/lit/an/slla037a/slla037a.pdf)，pp. 1–9 | E2 | UART/ACE 与 line interface 的分层；版本沿革；PC 9-contact mapping；modem-control 语义；null-modem 的一个完整示例 | 它把 9-contact shell 称为 “DB9S”，不能据此裁决 D-sub shell-size nomenclature；应用笔记不能覆盖标准原文 |
-| S9 | Analog Devices/Maxim, *MAX220–MAX249 +5V-Powered, Multichannel RS-232 Drivers/Receivers*；[datasheet](https://www.analog.com/media/en/technical-documentation/data-sheets/MAX220-MAX249.pdf)，pp. 1–7 | E1（器件） | 单 5 V 逻辑系统通过 charge pump 产生线路摆幅的实现例；明确分开 TTL/CMOS pins 与 RS-232 pins | 不能把 MAX232 家族的能力写成所有历史 RS-232 设备的能力 |
+| S9 | Analog Devices/Maxim, *MAX220–MAX249 +5V-Powered, Multichannel RS-232 Drivers/Receivers*, document no. `19-4323`, Rev 18, 5/19；[datasheet](https://www.analog.com/media/en/technical-documentation/data-sheets/MAX220-MAX249.pdf)，pp. 1–7 | E1（器件） | 单 5 V 逻辑系统通过 charge pump 产生线路摆幅的实现例；明确分开 TTL/CMOS pins 与 RS-232 pins | 不能把 MAX232 家族的能力写成所有历史 RS-232 设备的能力 |
 | S10 | Cinch, DE9S D-sub connector product page；[manufacturer page](https://www.cinch.com/products/d-shape/connectors/de9s) | E2（机械命名交叉核验） | `DE9` 是厂商仍在使用的 shell/contact nomenclature；可用来标注俗称 `DB9` 的术语风险 | PC serial pin assignment 或 RS-232 兼容性 |
 | S11 | OSDev Wiki, [Serial Ports](https://wiki.osdev.org/Serial_Ports) | E2 | 现代可检索的 PC-compatible UART/COM 实践说明与进一步线索 | 电气安全、规范要求、历史上的所有实现 |
 | S12 | pinoutguide/pinouts.ru, [PC 9-pin serial port](https://pinoutguide.com/SerialPorts/Serial9_pinout.shtml) | E5 | 常见 PC mapping 的线索与待比较对象 | 未经 S1/S4/原厂手册交叉验证的接线依据 |
@@ -58,8 +58,9 @@ connector, cable and DTE/DCE mapping
 
 - S2、S3 所列章节以及 S5–S12 的内容已在本轮打开核对；外链不等于将原文版权内容提交进仓库。
 - 2026-09-01 最终自动化可达性复查中，S1、S4–S9、S11–S12 使用 browser user-agent 返回 200；S10 同样返回 200，但 generic curl 被 403 bot filter 拦截；ITU 的 S2/S3 permalink 从本审计网络返回 500。后两项是当前站点访问限制，不能据此声称文献撤回，也不应写成“所有链接直接返回 200”。
-- S1 与 S4 是正式标准入口，但本轮没有取得合法可审阅全文，故明确标为 **未取得全文**。S4 的官方 catalog 将第三版标为 `ISO 2110:1989`，另列 `Amd 1:1991`；V.28 (1993) 的注释只写无版次的 `ISO 2110`，不能据此把 1989/1991 文本倒灌给 IBM 1984 或更早设备。
+- S1 只是第三方托管的标准封面/目录片段，不是 TIA 官方 catalog 或销售入口；它只能支持预览中直接可见的元数据。TIA 官方条目与合法可审阅全文仍是 Gate 1 缺口。S4 则是 IEC 官方 catalog 元数据，但同样未取得标准全文；它将第三版标为 `ISO 2110:1989`，另列 `Amd 1:1991`。V.28 (1993) 的注释只写无版次的 `ISO 2110`，不能据此把 1989/1991 文本倒灌给 IBM 1984 或更早设备。
 - S2/S3 是公开可读的国际规范，能先建立功能与电气骨架；它们不是把 S1 悄悄替换掉的借口。
+- S5 的 archive identifier/URL slug 与 PDF 文件名使用 `6322507`，但 archive 页面当前显示标题、扫描文献的封面与末尾 Reader's Comment Form 均为 `6361453`；引用以文献内编号为准，同时保留 archive URL 方便复核。
 - IBM 扫描的页码使用书内印刷页码，而不是 PDF viewer 的文件页序号。
 
 ## 按层整理的 claim ledger
@@ -130,10 +131,10 @@ RTS/CTS、DTR/DSR 等不是 UART 字节本身的一部分，而是独立 interch
 ```
 
 - Layer: protocol / host
-- Evidence: S2 §§4.1–4.6，pp. 13–17；S8 pp. 7–9
+- Evidence: S2 §1.1、Table 1、§§3.5–3.12、§4.5，pp. 1、3–7、17；S8 p. 1、pp. 7–9
 - Scope: V.24 semantics + later PC implementation guidance
 - Confidence: supported
-- Notes: V.24 §4.5 明确讨论 complementary equipment 未提供某些 circuits 的情况。正式展品要区分标准功能、PC 常见 subset 和某台设备的 wiring。
+- Notes: S8 p. 1 把 UART/ACE 的并串转换与 framing 放在 232 line interface 之前；V.24 §1.1 说明实际设备会按应用选择 circuits，§4.5 再规定未实现 circuits 的处理。正式展品要区分标准功能、PC 常见 subset 和某台设备的 wiring。
 
 ### D. Mechanical：25-contact 标准路径与 PC 9-contact 惯例分开
 
@@ -218,11 +219,11 @@ UART 的 start/stop/parity framing、modem symbol rate 与 application bytes/s �
 
 处理方式：正式 protocol/host pages 分别记录 bit/s、symbol/s（若适用）、frame format 与 payload throughput，不混用 `baud`。
 
-### 5. 现代 USB–serial adapter 不是透明时间机器
+### 5. 不预设具体 USB–serial adapter 是透明替代品
 
-USB bridge 可能省略 modem-control lines、使用不同 transceiver、做 buffering，并由现代 driver 暴露为 tty/COM device。一次 loopback 只能说明 adapter + driver + configuration。
+本轮还没有为任何具体 adapter 建立 datasheet、driver 文档或实测记录，因此不能把“省略 modem-control lines”“采用某类 transceiver”或“具有某种 buffering”写成 USB–serial 产品的普遍事实。这些只能先作为**逐产品待核验风险**：选定 adapter 后，分别确认它暴露的 signals、bridge/transceiver、driver 呈现的 tty/COM 行为以及 buffering/latency 条件。一次 loopback 的结论也只能限定到该 adapter、driver 与 configuration。
 
-处理方式：任何 E4 实测都记录 vendor/product ID、bridge/transceiver（能确认时）、driver、OS、line settings、使用的 signals、测量工具和限制。
+处理方式：先为指定产品补 datasheet/driver 来源；任何 E4 实测再记录 vendor/product ID、bridge/transceiver（能确认时）、driver、OS、line settings、使用的 signals、测量工具和限制。
 
 ## 二手资料查重结果
 
@@ -236,6 +237,7 @@ USB bridge 可能省略 modem-control lines、使用不同 transceiver、做 buf
 
 ### Gate 1 — 必须先补齐
 
+- [ ] 找到 TIA 官方 catalog/current-status 条目；S1 的第三方预览不能代替该入口；
 - [ ] 合法取得并审阅 TIA-232-F 全文，记录版次、clauses 与勘误/重申状态；
 - [ ] 合法取得并审阅 ISO 2110 的相关版次：以 1989 第三版及 Amd 1:1991 核对 V.28-era mapping；若比较 IBM 1984，则另查当时有效的 1980 第二版，不能以后版倒灌；
 - [ ] 找到 IBM 9-contact serial implementation 的原厂 technical reference，用来交叉核验 S8；
@@ -261,7 +263,7 @@ USB bridge 可能省略 modem-control lines、使用不同 transceiver、做 buf
 
 > **指定 USB–serial adapter 的 local loopback 与 line-side sample**
 
-最低记录字段：
+下面 11 项是这类 adapter 的**专项补充字段**，不是完整的 E4 最低安全模板。正式实验仍须填写 [`docs/HARDWARE-SAFETY.md`](../docs/HARDWARE-SAFETY.md) 中的日期、两端设备、线缆/breakout、供电状态、安全依据、不确定性等全局字段。
 
 ```yaml
 adapter_vendor_product_id: pending
@@ -281,7 +283,7 @@ result_scope: this adapter and setup only
 
 ## Source map 验收
 
-- [x] 定位正式 TIA 标准入口，并明确全文缺口；
+- [x] 识别 TIA-232-F 的第三方封面/目录预览，明确它不是正式 TIA 入口，并把官方条目与全文登记为 Gate 1 缺口；
 - [x] 用公开 E1 规范分别覆盖 functional (V.24) 与 electrical (V.28)；
 - [x] 用同期 IBM technical reference 覆盖 PC host integration 与 modem 语境；
 - [x] 用 driver/receiver datasheets 证明 UART logic 与 line electrical 不可混同；
