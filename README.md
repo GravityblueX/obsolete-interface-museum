@@ -52,7 +52,8 @@ exhibits/<interface>/
 ├── host-integration.md# IRQ/DMA/端口/驱动
 ├── experiment.md      # 可重复实验或模拟
 ├── descendants.md     # 继承关系与替代者
-└── sources.md         # 手册、标准、既有资料
+├── sources.md         # 手册、标准、既有资料
+└── exhibit.json       # 机器可读元数据（见 schemas/exhibit.schema.json）
 ```
 
 ## 第一批展品
