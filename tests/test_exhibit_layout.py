@@ -17,7 +17,10 @@ from scripts.validate_exhibit_layout import REQUIRED_FILES, validate_repository
 class ExhibitLayoutValidationTests(unittest.TestCase):
     def setUp(self):
         self.temporary_directory = tempfile.TemporaryDirectory()
-        self.repository_root = Path(self.temporary_directory.name)
+        # The validator canonicalizes its root before enumerating entries.
+        # Resolve the fixture root too so path-sensitive mocks stay valid when
+        # a hosted runner's temporary directory contains an indirection.
+        self.repository_root = Path(self.temporary_directory.name).resolve()
         self.junction_paths = []
         (self.repository_root / "exhibits").mkdir()
 
