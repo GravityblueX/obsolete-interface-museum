@@ -15,11 +15,8 @@ import re
 import sys
 from pathlib import Path
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_DECLARATION = re.compile(
-    r"^###[ \t]+(SRC-[0-9]{3})[ \t]+—[ \t]+(.*)$"
-)
+SOURCE_DECLARATION = re.compile(r"^###[ \t]+(SRC-[0-9]{3})[ \t]+—[ \t]+(.*)$")
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 ASCII_BLANK = re.compile(r"^[ \t]*$")
 HTML_COMMENT_START = re.compile(r"^ {0,3}<!--")
@@ -30,9 +27,7 @@ RAW_HTML_START = re.compile(
     r"^ {0,3}<(pre|script|style|textarea)(?:[ \t\v\f>]|$)",
     re.IGNORECASE | re.ASCII,
 )
-RAW_HTML_END = re.compile(
-    r"</(?:pre|script|style|textarea)>", re.IGNORECASE | re.ASCII
-)
+RAW_HTML_END = re.compile(r"</(?:pre|script|style|textarea)>", re.IGNORECASE | re.ASCII)
 
 
 @dataclass(frozen=True)

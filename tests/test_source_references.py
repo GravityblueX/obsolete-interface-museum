@@ -5,7 +5,6 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
@@ -150,12 +149,12 @@ class SourceReferenceValidationTests(unittest.TestCase):
         self.write_exhibit(
             "greater",
             [["SRC-404"]],
-            '<kbd title=\">\">\n### SRC-404 — Literal\n\n',
+            '<kbd title=">">\n### SRC-404 — Literal\n\n',
         )
         self.write_exhibit(
             "less",
             [["SRC-405"]],
-            '<kbd title=\"<\">\n### SRC-405 — Literal\n\n',
+            '<kbd title="<">\n### SRC-405 — Literal\n\n',
         )
 
         self.assertEqual(
@@ -239,10 +238,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
         self.write_exhibit(
             "serial",
             [["SRC-419"]],
-            "<pre>\n"
-            "</script>\n"
-            "\n"
-            "### SRC-419 — Real manual\n",
+            "<pre>\n" "</script>\n" "\n" "### SRC-419 — Real manual\n",
         )
 
         self.assertEqual([], validate_repository(self.repository_root))
@@ -299,7 +295,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
         self.assertEqual(
             [
                 "exhibits/ascii-uppercase/exhibit.json: "
-                "relationships[0].evidence[0]: source ID \"SRC-490\" is not "
+                'relationships[0].evidence[0]: source ID "SRC-490" is not '
                 "declared in exhibits/ascii-uppercase/sources.md",
                 *[
                     f"exhibits/{name}/sources.md:5: duplicate source ID {source_id}; "
@@ -342,8 +338,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
         self.write_exhibit(
             "duplicate",
             [],
-            "\ufeff### SRC-494 — First manual\n\n"
-            "### SRC-494 — Second manual\n",
+            "\ufeff### SRC-494 — First manual\n\n" "### SRC-494 — Second manual\n",
         )
         self.write_exhibit(
             "fence",
@@ -366,7 +361,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
                 "exhibits/duplicate/sources.md:3: duplicate source ID SRC-494; "
                 "first declared at line 1",
                 "exhibits/embedded-bom/exhibit.json: "
-                "relationships[0].evidence[0]: source ID \"SRC-497\" is not "
+                'relationships[0].evidence[0]: source ID "SRC-497" is not '
                 "declared in exhibits/embedded-bom/sources.md",
                 "exhibits/fence/exhibit.json: relationships[0].evidence[0]: "
                 'source ID "SRC-495" is not declared in exhibits/fence/sources.md',
@@ -381,9 +376,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
         self.write_exhibit(
             "serial",
             [["SRC-491"]],
-            "<pre>\n\n"
-            "</ſtyle>\n\n"
-            "### SRC-491 — Still raw HTML\n",
+            "<pre>\n\n" "</ſtyle>\n\n" "### SRC-491 — Still raw HTML\n",
         )
 
         self.assertEqual(
@@ -398,18 +391,12 @@ class SourceReferenceValidationTests(unittest.TestCase):
         self.write_exhibit(
             "fence",
             [["SRC-407"]],
-            "```markdown\n"
-            "```\u00a0\n"
-            "### SRC-407 — Still fenced\n"
-            "```\n",
+            "```markdown\n" "```\u00a0\n" "### SRC-407 — Still fenced\n" "```\n",
         )
         self.write_exhibit(
             "html",
             [["SRC-408"]],
-            "<div>\n"
-            "\u00a0\n"
-            "### SRC-408 — Still raw HTML\n"
-            "</div>\n",
+            "<div>\n" "\u00a0\n" "### SRC-408 — Still raw HTML\n" "</div>\n",
         )
 
         self.assertEqual(
@@ -429,17 +416,12 @@ class SourceReferenceValidationTests(unittest.TestCase):
         self.write_exhibit(
             "fence",
             [["SRC-420"]],
-            "```markdown\n"
-            "``` \t\n"
-            "\n"
-            "### SRC-420 — Real manual\n",
+            "```markdown\n" "``` \t\n" "\n" "### SRC-420 — Real manual\n",
         )
         self.write_exhibit(
             "html",
             [["SRC-421"]],
-            "<div>\n"
-            " \t\n"
-            "### SRC-421 — Real manual\n",
+            "<div>\n" " \t\n" "### SRC-421 — Real manual\n",
         )
 
         self.assertEqual([], validate_repository(self.repository_root))
@@ -463,10 +445,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
         self.write_exhibit(
             "serial",
             [["SRC-001"]],
-            "```foo`bar\n"
-            "\n"
-            "### SRC-001 — Real manual\n"
-            "```\n",
+            "```foo`bar\n" "\n" "### SRC-001 — Real manual\n" "```\n",
         )
 
         self.assertEqual([], validate_repository(self.repository_root))
@@ -475,8 +454,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
         self.write_exhibit(
             "serial",
             [["SRC-1", "SRC-0001"]],
-            "### SRC-1 — Short ID\n"
-            "### SRC-0001 — Long ID\n",
+            "### SRC-1 — Short ID\n" "### SRC-0001 — Long ID\n",
         )
 
         self.assertEqual(
@@ -718,8 +696,7 @@ class SourceReferenceValidationTests(unittest.TestCase):
         self.write_exhibit(
             "zeta",
             [["SRC-009"]],
-            "### SRC-001 — First manual\n\n"
-            "### SRC-001 — Duplicate manual\n",
+            "### SRC-001 — First manual\n\n" "### SRC-001 — Duplicate manual\n",
         )
         self.write_exhibit(
             "alpha",
