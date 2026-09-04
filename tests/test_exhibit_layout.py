@@ -132,20 +132,60 @@ class ExhibitLayoutValidationTests(unittest.TestCase):
             validate_repository(self.repository_root),
         )
 
-    def test_nested_manifest_is_rejected(self):
+    def test_extra_root_file_is_rejected(self):
         exhibit_directory = self.write_valid_exhibit()
-        nested_directory = exhibit_directory / "draft" / "revision"
-        nested_directory.mkdir(parents=True)
-        (nested_directory / "exhibit.json").write_text(
-            '{"id": "nested"}\n', encoding="utf-8"
-        )
+        (exhibit_directory / "notes.md").write_text("# Notes\n", encoding="utf-8")
 
         self.assertEqual(
             [
-                "exhibits/serial/draft/revision/exhibit.json: nested exhibit.json "
-                "is not allowed; metadata must be at the exhibit directory root"
+                "exhibits/serial/notes.md: unexpected exhibit file; exact layout "
+                "allows only the nine required root files"
             ],
             validate_repository(self.repository_root),
+        )
+
+    def test_any_nested_directory_is_rejected_without_descending(self):
+        exhibit_directory = self.write_valid_exhibit()
+        nested_directory = exhibit_directory / "draft" / "revision"
+        nested_directory.mkdir(parents=True)
+        (nested_directory / "notes.txt").write_text("hidden\n", encoding="utf-8")
+
+        self.assertEqual(
+            [
+                "exhibits/serial/draft: nested exhibit directory is not allowed; "
+                "exact layout permits no subdirectories"
+            ],
+            validate_repository(self.repository_root),
+        )
+
+    def test_regular_mode_reparse_companion_path_is_rejected(self):
+        exhibit_directory = self.write_valid_exhibit()
+        physical_path = exhibit_directory / "physical.md"
+        original_lstat = Path.lstat
+
+        def reports_physical_file_as_regular_reparse_point(path):
+            result = original_lstat(path)
+            if path == physical_path:
+                return mock.Mock(
+                    st_mode=stat.S_IFREG | 0o644,
+                    st_file_attributes=0x0400,
+                )
+            return result
+
+        with mock.patch.object(
+            Path,
+            "lstat",
+            autospec=True,
+            side_effect=reports_physical_file_as_regular_reparse_point,
+        ):
+            errors = validate_repository(self.repository_root)
+
+        self.assertEqual(
+            [
+                "exhibits/serial/physical.md: reparse-point exhibit file is not "
+                "allowed"
+            ],
+            errors,
         )
 
     def test_metadata_id_must_match_directory_name(self):
@@ -494,8 +534,8 @@ class ExhibitLayoutValidationTests(unittest.TestCase):
 
         expected = [
             "exhibits/alpha/sources.md: required exhibit file is missing",
-            "exhibits/alpha/z-draft/exhibit.json: nested exhibit.json is not "
-            "allowed; metadata must be at the exhibit directory root",
+            "exhibits/alpha/z-draft: nested exhibit directory is not allowed; "
+            "exact layout permits no subdirectories",
             "exhibits/zeta/README.md: required exhibit file is missing",
             'exhibits/zeta/exhibit.json: id "wrong" does not match exhibit '
             'directory "zeta" (expected "zeta")',

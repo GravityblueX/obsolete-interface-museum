@@ -98,7 +98,6 @@ def _nested_layout_diagnostics(
         file_names.sort()
         current_directory = Path(directory)
 
-        traversable_directory_names: list[str] = []
         for directory_name in directory_names:
             nested_directory = current_directory / directory_name
             relative_nested_directory = _relative_path(
@@ -115,6 +114,12 @@ def _nested_layout_diagnostics(
                         f"exhibit directory: {error}",
                     )
                 )
+                continue
+
+            # A required root entry with a directory-like mode is diagnosed by
+            # the exact required-file check below.  Do not descend into it or
+            # emit a second, less specific nested-layout diagnostic here.
+            if directory_name in REQUIRED_FILES:
                 continue
 
             if stat.S_ISLNK(nested_status.st_mode):
@@ -138,28 +143,33 @@ def _nested_layout_diagnostics(
                 )
                 continue
 
-            traversable_directory_names.append(directory_name)
+            diagnostics.append(
+                _Diagnostic(
+                    relative_nested_directory,
+                    4,
+                    f"{relative_nested_directory}: nested exhibit directory is not "
+                    "allowed; exact layout permits no subdirectories",
+                )
+            )
 
         # ``os.walk(..., followlinks=False)`` still follows Windows junctions.
-        # Mutating this top-down list is what prevents traversal after lstat.
-        directory_names[:] = traversable_directory_names
-        if current_directory == exhibit_directory:
-            continue
-
-        for entry_name in (*directory_names, *file_names):
-            if entry_name == "exhibit.json":
-                nested_manifest = current_directory / entry_name
-                relative_nested_manifest = _relative_path(
-                    repository_root, nested_manifest
+        # Mutating this top-down list prevents traversal after lstat.  Exact
+        # layouts permit no subdirectories, so even ordinary directories are
+        # diagnosed and pruned here.
+        directory_names[:] = []
+        for file_name in file_names:
+            if file_name in REQUIRED_FILES:
+                continue
+            unexpected_file = current_directory / file_name
+            relative_unexpected_file = _relative_path(repository_root, unexpected_file)
+            diagnostics.append(
+                _Diagnostic(
+                    relative_unexpected_file,
+                    4,
+                    f"{relative_unexpected_file}: unexpected exhibit file; "
+                    "exact layout allows only the nine required root files",
                 )
-                diagnostics.append(
-                    _Diagnostic(
-                        relative_nested_manifest,
-                        4,
-                        f"{relative_nested_manifest}: nested exhibit.json is not "
-                        "allowed; metadata must be at the exhibit directory root",
-                    )
-                )
+            )
 
     return diagnostics
 
@@ -307,7 +317,7 @@ def validate_repository(repository_root: Path) -> list[str]:
             required_path = exhibit_directory / required_name
             relative_required_path = _relative_path(repository_root, required_path)
             try:
-                required_mode = required_path.lstat().st_mode
+                required_status = required_path.lstat()
             except FileNotFoundError:
                 diagnostics.append(
                     _Diagnostic(
@@ -327,7 +337,7 @@ def validate_repository(repository_root: Path) -> list[str]:
                 )
                 continue
 
-            if stat.S_ISLNK(required_mode):
+            if stat.S_ISLNK(required_status.st_mode):
                 diagnostics.append(
                     _Diagnostic(
                         relative_required_path,
@@ -336,7 +346,17 @@ def validate_repository(repository_root: Path) -> list[str]:
                     )
                 )
                 continue
-            if not stat.S_ISREG(required_mode):
+            if _is_reparse_point(required_status):
+                diagnostics.append(
+                    _Diagnostic(
+                        relative_required_path,
+                        1,
+                        f"{relative_required_path}: reparse-point exhibit file is "
+                        "not allowed",
+                    )
+                )
+                continue
+            if not stat.S_ISREG(required_status.st_mode):
                 diagnostics.append(
                     _Diagnostic(
                         relative_required_path,
