@@ -347,7 +347,7 @@ def validate_repository(repository_root: Path) -> list[str]:
                     (),
                     0,
                     f"{relative_exhibit_path}: duplicate JSON object key "
-                    f"{json.dumps(error.key, ensure_ascii=False)}",
+                    f"{json.dumps(error.key)}",
                 )
             )
             continue
