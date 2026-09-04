@@ -872,6 +872,37 @@ class SourceReferenceValidationTests(unittest.TestCase):
     def test_checked_in_template_and_corpus_are_valid(self):
         self.assertEqual([], validate_repository(REPOSITORY_ROOT))
 
+    def test_duplicate_json_object_keys_are_rejected_before_reference_checks(self):
+        cases = {
+            "nested": (
+                '{"relationships": [{"evidence": ["SRC-404"], '
+                '"evidence": ["SRC-001"]}]}'
+            ),
+            "top-level": (
+                '{"relationships": [{"evidence": ["SRC-404"]}], ' '"relationships": []}'
+            ),
+        }
+        for name, metadata in cases.items():
+            exhibit_directory = self.repository_root / "exhibits" / name
+            exhibit_directory.mkdir(parents=True)
+            (exhibit_directory / "exhibit.json").write_text(
+                metadata,
+                encoding="utf-8",
+            )
+            (exhibit_directory / "sources.md").write_text(
+                "### SRC-001 — Original manual\n",
+                encoding="utf-8",
+            )
+
+        self.assertEqual(
+            [
+                "exhibits/nested/exhibit.json: duplicate JSON object key " '"evidence"',
+                "exhibits/top-level/exhibit.json: duplicate JSON object key "
+                '"relationships"',
+            ],
+            validate_repository(self.repository_root),
+        )
+
     def test_non_object_metadata_has_stable_diagnostic(self):
         for index, document in enumerate(([], None, "text", 42)):
             exhibit_directory = self.repository_root / "exhibits" / f"case-{index}"

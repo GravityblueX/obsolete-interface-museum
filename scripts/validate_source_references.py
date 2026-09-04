@@ -38,6 +38,21 @@ class _Diagnostic:
     message: str
 
 
+class _DuplicateJsonKeyError(ValueError):
+    def __init__(self, key: str) -> None:
+        self.key = key
+        super().__init__(f"duplicate JSON object key {key!r}")
+
+
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    document: dict[str, object] = {}
+    for key, value in pairs:
+        if key in document:
+            raise _DuplicateJsonKeyError(key)
+        document[key] = value
+    return document
+
+
 def _relative_path(repository_root: Path, path: Path) -> str:
     return path.relative_to(repository_root).as_posix()
 
@@ -321,7 +336,21 @@ def validate_repository(repository_root: Path) -> list[str]:
     for exhibit_path in exhibit_paths:
         relative_exhibit_path = _relative_path(repository_root, exhibit_path)
         try:
-            document = json.loads(exhibit_path.read_text(encoding="utf-8"))
+            document = json.loads(
+                exhibit_path.read_text(encoding="utf-8"),
+                object_pairs_hook=_unique_json_object,
+            )
+        except _DuplicateJsonKeyError as error:
+            diagnostics.append(
+                _Diagnostic(
+                    relative_exhibit_path,
+                    (),
+                    0,
+                    f"{relative_exhibit_path}: duplicate JSON object key "
+                    f"{json.dumps(error.key, ensure_ascii=False)}",
+                )
+            )
+            continue
         except json.JSONDecodeError as error:
             diagnostics.append(
                 _Diagnostic(
