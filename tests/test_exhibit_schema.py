@@ -35,6 +35,12 @@ class ExhibitSchemaRegressionTests(unittest.TestCase):
         document["relationships"] = [relationship]
         return document
 
+    def document_with_evidence_summary(self, highest_level, primary_sources):
+        document = copy.deepcopy(self.template)
+        document["evidence_summary"]["highest_level"] = highest_level
+        document["evidence_summary"]["primary_sources"] = primary_sources
+        return document
+
     def assert_valid(self, document):
         errors = sorted(
             self.validator.iter_errors(document),
@@ -86,6 +92,54 @@ class ExhibitSchemaRegressionTests(unittest.TestCase):
         for exhibit_path in exhibit_paths:
             with self.subTest(path=exhibit_path.relative_to(REPOSITORY_ROOT)):
                 self.assert_valid(load_json(exhibit_path))
+
+    def test_e1_summary_requires_a_primary_source(self):
+        document = self.document_with_evidence_summary("E1", 0)
+        errors = list(self.validator.iter_errors(document))
+        matching_errors = [
+            error
+            for error in errors
+            if error.validator == "minimum"
+            and list(error.absolute_path) == ["evidence_summary", "primary_sources"]
+        ]
+        self.assertTrue(
+            matching_errors,
+            f"expected an E1 summary to require a primary source; got {errors!r}",
+        )
+
+    def test_primary_source_count_requires_e1_summary(self):
+        for highest_level in ("E2", "E3", "E4", "E5"):
+            document = self.document_with_evidence_summary(highest_level, 1)
+            errors = list(self.validator.iter_errors(document))
+            matching_errors = [
+                error
+                for error in errors
+                if error.validator == "const"
+                and list(error.absolute_path) == ["evidence_summary", "highest_level"]
+            ]
+            with self.subTest(highest_level=highest_level):
+                self.assertTrue(
+                    matching_errors,
+                    f"expected primary source count to require E1; got {errors!r}",
+                )
+
+    def test_coherent_evidence_summaries_validate(self):
+        cases = [
+            ("E1", 1),
+            ("E1", 3),
+            *[(level, 0) for level in ("E2", "E3", "E4", "E5")],
+        ]
+        for highest_level, primary_sources in cases:
+            with self.subTest(
+                highest_level=highest_level,
+                primary_sources=primary_sources,
+            ):
+                self.assert_valid(
+                    self.document_with_evidence_summary(
+                        highest_level,
+                        primary_sources,
+                    )
+                )
 
     def test_compatible_relationship_accepts_meaningful_directions(self):
         for direction in ("one-way", "bidirectional", "unknown"):

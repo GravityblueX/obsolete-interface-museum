@@ -51,7 +51,7 @@ State what is new compared with a pinout database: cross-layer explanation, sour
 ## Evidence status
 
 - Highest evidence level:
-- Primary/contemporary sources found:
+- Primary/contemporary sources used:
 - Emulation status:
 - Hardware status:
 - Safety blockers:

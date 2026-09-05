@@ -80,6 +80,34 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["highest_level", "primary_sources", "hardware_status"],
+      "allOf": [
+        {
+          "if": {
+            "required": ["highest_level"],
+            "properties": {
+              "highest_level": { "const": "E1" }
+            }
+          },
+          "then": {
+            "properties": {
+              "primary_sources": { "minimum": 1 }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["primary_sources"],
+            "properties": {
+              "primary_sources": { "type": "integer", "minimum": 1 }
+            }
+          },
+          "then": {
+            "properties": {
+              "highest_level": { "const": "E1" }
+            }
+          }
+        }
+      ],
       "properties": {
         "highest_level": { "enum": ["E1", "E2", "E3", "E4", "E5"] },
         "primary_sources": { "type": "integer", "minimum": 0 },

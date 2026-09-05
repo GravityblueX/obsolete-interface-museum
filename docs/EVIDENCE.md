@@ -12,6 +12,10 @@
 | E4 | 本项目实测 | 指定设备、指定 setup 下的实际行为 | 整个标准或所有设备的普遍结论 |
 | E5 | pinout 数据库、论坛、博客、个人笔记 | 线索、检索入口、待验证假设 | 未交叉验证的真实接线与安全结论 |
 
+`exhibit.json` 中的 `evidence_summary.primary_sources` 统计展品实际使用的 E1
+来源。因此该值大于零时 `highest_level` 必须是 `E1`；没有 E1 来源时，则应在
+E2 至 E5 中记录当前实际可用的最高等级。
+
 ## Claim discipline
 
 每个关键结论应尽量记录：
